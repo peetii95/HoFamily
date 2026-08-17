@@ -568,7 +568,7 @@
 const CONFIG = {
   SHEET_ID: "1zhE6WdbfF9bsMldSkXVgzMa1NShx09vLdF1-IFt_HaU",   // <-- ID Google Sheet
   TAB:      "GiaPha",
-  ROOT_ID:  "I",
+  ROOT_ID:  "",
   FAMILY_NAME: "Gia phả họ Hồ",
   SEAL: "胡",                    // chữ Hán/ký tự trên dấu triện (họ Hồ = 胡)
 };
@@ -864,20 +864,21 @@ function transform(rows){
 
   const data=[...map.values()].map(p=>{ delete p._father; delete p._mother; delete p._spouses; return p; });
 
-  // ĐỜI: ưu tiên cột "Đời" (H) — số La Mã (XIV) hoặc số thường (14);
-  // nếu trống thì lấy tiền tố La Mã trong ID; cuối cùng mới tự tính từ quan hệ cha–con.
+  // ĐỜI (độc lập định dạng ID): ưu tiên cột "Đời"; nếu trống thì lấy từ tiền tố ID
+  // (số La Mã "XII", hoặc số thường trong "14-3"); cuối cùng mới tự tính từ quan hệ.
   const genAuto = computeGenerations(data);
+  const numOr = (s)=>{ const n=parseInt(String(s).replace(/[^0-9]/g,''),10); return (!isNaN(n)&&n>0)?n:null; };
   data.forEach(d=>{
-    const col = String(d.data.doi||'').trim();      // giá trị cột "Đời" (đặt lúc tạo object)
-    const rc = romanToInt(col);
-    const ac = parseInt(col.replace(/[^0-9]/g,''),10);
-    const rp = romanToInt(doiPrefix(d.id));
-    let g = (rc!=null) ? rc
-          : (!isNaN(ac) && ac>0) ? ac
-          : (rp!=null) ? rp
-          : genAuto[d.id];
+    const col = String(d.data.doi||'').trim();               // giá trị cột "Đời"
+    const prefix = doiPrefix(d.id);                          // phần trước dấu "-" của ID
+    const fromCol = (romanToInt(col) ?? numOr(col));         // cột: La Mã hoặc số
+    const fromId  = (romanToInt(prefix) != null) ? romanToInt(prefix)
+                  : (d.id.indexOf('-') !== -1 ? numOr(prefix) : null);  // "14-3"→14; ID trần không suy
+    const g = (fromCol && fromCol>0) ? fromCol
+            : (fromId && fromId>0)   ? fromId
+            : genAuto[d.id];
     d.data.gen_num = g || genAuto[d.id] || 1;
-    d.data.doi = intToRoman(d.data.gen_num) || String(d.data.gen_num);   // hiển thị La Mã cho đồng nhất
+    d.data.doi = String(d.data.gen_num);                     // hiển thị SỐ THƯỜNG
     d.data.gen_auto = genAuto[d.id];
   });
 
@@ -1149,7 +1150,8 @@ function validateRows(rows){
     me:    normId(get(r,COL.mother)),
     vc:    splitIds(get(r,COL.spouses)).map(normId),
     doiCol:String(get(r,COL.gen)||'').trim(),
-    doiId: romanToInt(doiPrefix(normId(get(r,COL.id)))),
+    doiId: (function(){ const id=normId(get(r,COL.id)); const p=doiPrefix(id); const rm=romanToInt(p);
+             if(rm!=null) return rm; if(id.indexOf('-')!==-1){ const n=parseInt(p,10); if(!isNaN(n)&&n>0) return n; } return null; })(),
   })).filter(p=> p.ma || p.ten);   // bỏ dòng trống hẳn
 
   people.forEach(p=>{ if(!p.ma) return; if(seen.has(p.ma)) dup.add(p.ma); else seen.set(p.ma,p.ten); });
@@ -1491,7 +1493,7 @@ function openDoi(){
   const wrap=$('#doi-chips'); if(!wrap) return;
   const maxDoi=Math.max(1, ...DATA.map(d=>d.data.gen_num||1));
   let html=`<button class="doi-chip all" data-doi="0">Toàn bộ (từ thuỷ tổ)</button>`;
-  for(let n=1;n<=maxDoi;n++){ if(DATA.some(d=>d.data.gen_num===n)) html+=`<button class="doi-chip" data-doi="${n}">Đời ${intToRoman(n)}</button>`; }
+  for(let n=1;n<=maxDoi;n++){ if(DATA.some(d=>d.data.gen_num===n)) html+=`<button class="doi-chip" data-doi="${n}">Đời ${n}</button>`; }
   wrap.innerHTML=html;
   wrap.querySelectorAll('.doi-chip').forEach(c=> c.onclick=()=>{ pickDoi(+c.getAttribute('data-doi')); closeDoi(); });
   $('#doi-back').classList.add('open'); $('#doi').classList.add('open');
