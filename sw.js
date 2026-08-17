@@ -3,7 +3,7 @@
    - Dữ liệu Google Sheet: ưu tiên mạng (mới nhất), offline dùng bản đã lưu
    - Thư viện CDN, phông chữ, ảnh Drive: dùng cache, ngầm cập nhật
    Đổi số phiên bản khi cập nhật để xoá cache cũ. */
-const VERSION = 'giapha-v2';
+const VERSION = 'giapha-v3';
 const CORE = [
   './', './index.html', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './icon-512-maskable.png',

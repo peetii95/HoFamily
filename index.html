@@ -187,10 +187,11 @@
     background:linear-gradient(180deg,#FCFAF4,#F6F1E6);
     border-left:1px solid var(--line);
     box-shadow:-14px 0 40px rgba(42,38,32,.14);
-    transform:translateX(105%); transition:transform .28s cubic-bezier(.2,.7,.2,1);
+    transform:translateX(105%); visibility:hidden;
+    transition:transform .28s cubic-bezier(.2,.7,.2,1), visibility .28s;
     display:flex; flex-direction:column;
   }
-  #detail.open{ transform:none }
+  #detail.open{ transform:none; visibility:visible }
   .d-head{ position:relative; padding:22px 20px 16px; border-bottom:1px solid var(--line) }
   .d-head .gen{ font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--cinnabar); font-weight:600 }
   .d-photo{
@@ -395,6 +396,38 @@
     padding:15px 16px; font:inherit; font-size:15px; font-weight:600; color:var(--ink); cursor:pointer }
   .more-btn:active{ border-color:var(--gold) }
   .more-note{ font-size:12px; color:var(--ink-soft); margin-top:4px; text-align:center }
+  /* ---- Ô tìm kiếm (toàn màn hình) ---- */
+  .search-open{ display:flex; align-items:center; gap:8px; background:var(--card); border:1px solid var(--line);
+    border-radius:999px; padding:8px 14px; color:var(--ink-soft); font:inherit; font-size:13px; cursor:pointer; max-width:52vw }
+  .search-open svg{ width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.8; flex:0 0 auto }
+  .search-open span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+  #search-back{ position:fixed; inset:0; z-index:69; background:rgba(34,30,24,.34); display:none }
+  #search-back.open{ display:block }
+  #search{ position:fixed; inset:0; z-index:70; background:var(--paper); display:none; flex-direction:column }
+  #search.open{ display:flex }
+  .search-bar{ display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--line); background:var(--card);
+    padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px }
+  .search-bar input{ flex:1; min-width:0; font:inherit; font-size:16px; padding:11px 12px; border:1px solid var(--line);
+    border-radius:10px; background:#fff; color:var(--ink) }
+  .s-close{ border:0; background:none; color:var(--cinnabar); font:inherit; font-weight:700; cursor:pointer; padding:8px 6px }
+  #search-results{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch }
+  .search-empty{ padding:26px 16px; text-align:center; color:var(--ink-soft); font-size:14px }
+
+  /* ---- Hộp chọn "xem từ đời nào" ---- */
+  #doi-back{ position:fixed; inset:0; z-index:60; background:rgba(34,30,24,.38); display:none }
+  #doi-back.open{ display:block }
+  #doi{ position:fixed; z-index:61; left:0; right:0; bottom:0; display:none;
+    background:linear-gradient(180deg,#FCFAF4,#F6F1E6); border-top:1px solid var(--line);
+    border-radius:18px 18px 0 0; box-shadow:0 -14px 44px rgba(42,38,32,.24);
+    padding:18px 16px calc(20px + env(safe-area-inset-bottom,0px)) }
+  #doi.open{ display:block }
+  #doi::before{ content:""; position:absolute; top:8px; left:50%; transform:translateX(-50%); width:44px; height:5px; border-radius:3px; background:var(--line) }
+  .doi-head{ font-family:'Noto Serif',serif; font-size:17px; margin:8px 2px 14px }
+  .doi-chips{ display:grid; grid-template-columns:repeat(auto-fill,minmax(72px,1fr)); gap:8px }
+  .doi-chip{ border:1px solid var(--line); background:var(--card); border-radius:10px; padding:11px 6px;
+    font:inherit; font-size:14px; color:var(--ink); cursor:pointer; text-align:center }
+  .doi-chip.all{ grid-column:1/-1; font-weight:600; color:var(--cinnabar); border-color:#e6c3bd; background:#FBF2F0 }
+  .doi-chip:active{ border-color:var(--gold) }
 </style>
 </head>
 <body>
@@ -409,12 +442,16 @@
   <div class="legend">
     <span><i class="m"></i>Nam</span><span><i class="f"></i>Nữ</span>
   </div>
-  <div id="search-cont"></div>
+  <button id="search-open" class="search-open" aria-label="Tìm người">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+    <span>Tìm người…</span>
+  </button>
 </header>
 
 <div id="tree"><div class="f3" id="FamilyChart"></div><div id="gen-labels"></div>
   <div id="tree-controls">
     <button class="btn" id="btn-root">Về gốc</button>
+    <button class="btn" id="btn-doi">Xem từ đời…</button>
     <select class="btn sel" id="branch" title="Lọc theo chi/nhánh"></select>
     <button class="btn" id="btn-fit">Vừa màn hình</button>
     <button class="btn" id="btn-orient">Xoay dọc/ngang</button>
@@ -445,6 +482,21 @@
   <button class="nav-item" data-tab="people"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c0-3 2.6-4.8 5.5-4.8s5.5 1.8 5.5 4.8"/><path d="M16 5.2a3 3 0 0 1 0 5.6"/><path d="M20.5 19c0-2.3-1.6-3.9-3.7-4.4"/></svg><span>Danh bạ</span></button>
   <button class="nav-item" data-tab="more"><svg class="filled" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg><span>Thêm</span></button>
 </nav>
+
+<div id="search-back"></div>
+<div id="search">
+  <div class="search-bar">
+    <input id="search-input" type="search" inputmode="search" autocomplete="off" placeholder="Tìm theo tên, tên tự, pháp danh…" />
+    <button id="search-close" class="s-close">Đóng</button>
+  </div>
+  <div id="search-results"></div>
+</div>
+
+<div id="doi-back"></div>
+<div id="doi">
+  <div class="doi-head">Xem cây từ đời nào?</div>
+  <div id="doi-chips" class="doi-chips"></div>
+</div>
 
 <div id="checker-back"></div>
 <div id="checker">
@@ -623,6 +675,11 @@ function romanToInt(s){
   const m={I:1,V:5,X:10,L:50,C:100,D:500,M:1000}; let n=0;
   for(let i=0;i<s.length;i++){ const c=m[s[i]], nx=m[s[i+1]]; if(nx&&c<nx) n-=c; else n+=c; }
   return n;
+}
+function intToRoman(n){
+  n=parseInt(n,10); if(!n||n<1||n>3999) return '';
+  const map=[[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
+  let s=''; for(const [v,sym] of map){ while(n>=v){ s+=sym; n-=v; } } return s;
 }
 const pad2 = n => String(n).padStart(2,'0');
 /* Định dạng ngày linh hoạt: chấp nhận 3 mức thông tin
@@ -807,13 +864,20 @@ function transform(rows){
 
   const data=[...map.values()].map(p=>{ delete p._father; delete p._mother; delete p._spouses; return p; });
 
-  // ĐỜI: ưu tiên số La Mã ở đầu ID (vd "XII-6" → Đời XII). Nếu ID không theo định dạng đó
-  // thì tự tính từ quan hệ cha–con (tương thích dữ liệu cũ dạng số).
+  // ĐỜI: ưu tiên cột "Đời" (H) — số La Mã (XIV) hoặc số thường (14);
+  // nếu trống thì lấy tiền tố La Mã trong ID; cuối cùng mới tự tính từ quan hệ cha–con.
   const genAuto = computeGenerations(data);
   data.forEach(d=>{
-    const r = romanToInt(doiPrefix(d.id));
-    if(r!=null){ d.data.gen_num = r; d.data.doi = doiPrefix(d.id); }      // theo ID (số La Mã)
-    else { d.data.gen_num = genAuto[d.id]; d.data.doi = String(genAuto[d.id]); }
+    const col = String(d.data.doi||'').trim();      // giá trị cột "Đời" (đặt lúc tạo object)
+    const rc = romanToInt(col);
+    const ac = parseInt(col.replace(/[^0-9]/g,''),10);
+    const rp = romanToInt(doiPrefix(d.id));
+    let g = (rc!=null) ? rc
+          : (!isNaN(ac) && ac>0) ? ac
+          : (rp!=null) ? rp
+          : genAuto[d.id];
+    d.data.gen_num = g || genAuto[d.id] || 1;
+    d.data.doi = intToRoman(d.data.gen_num) || String(d.data.gen_num);   // hiển thị La Mã cho đồng nhất
     d.data.gen_auto = genAuto[d.id];
   });
 
@@ -836,7 +900,6 @@ function transform(rows){
 function render(data, mainId){
   $('#loader').style.display='none';
   $('#FamilyChart').innerHTML='';
-  $('#search-cont').innerHTML='';
   const main = mainId || '';
 
   CHART = f3.createChart('#FamilyChart', data)
@@ -855,18 +918,12 @@ function render(data, mainId){
 
   if(main) CHART.updateMainId(main);
 
+  // mặc định: cây nằm NGANG (từ trái sang phải)
+  ORIENT_V = false;
+  CHART.setOrientationHorizontal();
+
   // vẽ vạch ngăn các đời sau mỗi lần cập nhật cây
   CHART.setAfterUpdate(drawGenSeparators);
-
-  // ô tìm người
-  // ô tìm người: tìm theo Tên, Tên tự và Pháp danh (đều nằm trong nhãn để lọc & tô sáng)
-  CHART.setPersonDropdown(d=>{
-    const x=d.data||{};
-    return [ x.ho_ten,
-             x.tu ? ('Tự '+x.tu) : '',
-             x.phap_danh ? ('PD '+x.phap_danh) : '',
-             x.years || '' ].filter(Boolean).join(' · ');
-  }, { cont: $('#search-cont'), placeholder:'Tìm theo tên / tên tự / pháp danh…' });
 
   CHART.updateTree({initial:true, tree_position:'fit'});
 }
@@ -1336,6 +1393,7 @@ const ICON = {
   calendar:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 3v4M16 3v4"/></svg>'
 };
 
+let TREE_SEEN = false;
 function showTab(name){
   document.body.dataset.tab = name;
   ['home','people','more'].forEach(n=>{
@@ -1343,7 +1401,10 @@ function showTab(name){
     if(v){ const on = (n===name); v.classList.toggle('active', on); if(on) v.scrollTop=0; }
   });
   document.querySelectorAll('#navbar .nav-item').forEach(b=> b.classList.toggle('active', b.dataset.tab===name));
-  if(name==='tree' && CHART){ setTimeout(()=>{ try{ CHART.updateTree({tree_position:'fit'}); }catch(_){ } }, 40); }
+  if(name==='tree' && CHART){
+    setTimeout(()=>{ try{ CHART.updateTree({tree_position:'fit'}); }catch(_){ } }, 40);
+    if(!TREE_SEEN){ TREE_SEEN = true; setTimeout(openDoi, 260); }   // lần đầu vào tab Cây: hỏi xem từ đời nào
+  }
 }
 
 function buildHome(){
@@ -1353,26 +1414,8 @@ function buildHome(){
   const nam = DATA.filter(d=> d.data.gender==='M').length;
   const nu  = DATA.filter(d=> d.data.gender==='F').length;
 
-  const gios = DATA.filter(d=> d.data.gio)
-    .map(d=>({ d, ng: nextGio(d.data.gio.day, d.data.gio.month) }))
-    .sort((a,b)=> (a.ng?a.ng.days:1e9) - (b.ng?b.ng.days:1e9))
-    .slice(0,3);
-
-  const gioRows = gios.length ? gios.map(({d,ng})=>{
-    const days = ng ? (ng.days===0 ? '<b>Hôm nay</b>' : 'còn '+ng.days+' ngày') : '';
-    return `<div class="gio-mini" data-id="${escapeHtml(d.id)}">
-      <div><div class="nm">${escapeHtml(d.data.ho_ten)}</div>
-      <div class="sub">mùng ${d.data.gio.day} tháng ${tenThangAL(d.data.gio.month)}${ng?(' · '+fmtDate(ng.date)):''}</div></div>
-      <div class="dd">${days}</div></div>`;
-  }).join('') : `<div class="h-empty">Chưa có dữ liệu ngày giỗ.</div>`;
-
   el.innerHTML = `
     <button class="home-search" id="home-search">${ICON.search}<span>Tìm theo tên, tên tự, pháp danh…</span></button>
-
-    <div class="h-card gio">
-      <div class="h-title">${ICON.flame}<span>Giỗ sắp tới</span><span class="more" id="home-gio-all">Xem tất cả ›</span></div>
-      ${gioRows}
-    </div>
 
     <div class="stats">
       <div class="stat"><div class="n">${maxDoi}</div><div class="l">đời</div></div>
@@ -1385,16 +1428,14 @@ function buildHome(){
       <button class="tile" id="tile-tree">${ICON.tree}<div class="t">Xem cây</div><div class="d">Toàn bộ dòng họ</div></button>
       <button class="tile" id="tile-people">${ICON.users}<div class="t">Danh bạ</div><div class="d">Danh sách mọi người</div></button>
       <button class="tile" id="tile-rel">${ICON.swap}<div class="t">Tra quan hệ</div><div class="d">Giữa hai người</div></button>
-      <button class="tile" id="tile-gio">${ICON.calendar}<div class="t">Lịch giỗ</div><div class="d">Cả năm âm lịch</div></button>
+      <button class="tile" id="tile-search">${ICON.search}<div class="t">Tìm người</div><div class="d">Theo tên, tên tự…</div></button>
     </div>`;
 
-  el.querySelectorAll('.gio-mini').forEach(r=> r.onclick=()=>{ const p=DATA.find(x=>x.id===r.getAttribute('data-id')); if(p) openDetail(p); });
-  el.querySelector('#home-gio-all').onclick = openGio;
-  el.querySelector('#home-search').onclick = ()=>{ const i=document.querySelector('#search-cont input'); if(i){ i.focus(); i.click&&i.click(); } };
+  el.querySelector('#home-search').onclick = openSearch;
   el.querySelector('#tile-tree').onclick   = ()=> showTab('tree');
   el.querySelector('#tile-people').onclick = ()=> showTab('people');
   el.querySelector('#tile-rel').onclick    = openRel;
-  el.querySelector('#tile-gio').onclick    = openGio;
+  el.querySelector('#tile-search').onclick = openSearch;
 }
 
 function buildPeople(){
@@ -1417,6 +1458,60 @@ function buildPeople(){
 document.querySelectorAll('#navbar .nav-item').forEach(b=> b.onclick=()=> showTab(b.dataset.tab));
 $('#btn-reload').onclick = ()=>{ try{ localStorage.removeItem('giapha_cache'); }catch(_){ } location.reload(); };
 $('#btn-about').onclick  = ()=> showBanner('Trang <b>Giới thiệu dòng họ</b> sẽ có ở bản cập nhật sau.');
+
+/* ---- Tìm kiếm (overlay toàn màn hình, không dấu) ---- */
+function noAccent(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đĐ]/g,'d').toLowerCase(); }
+function renderSearch(q){
+  const box=$('#search-results'); const nq=noAccent(q).trim();
+  let list=[...DATA];
+  if(nq){ list=list.filter(d=>{ const hay=noAccent([d.data.ho_ten,d.data.tu,d.data.phap_danh].filter(Boolean).join(' ')); return hay.includes(nq); }); }
+  list.sort((a,b)=> (a.data.gen_num-b.data.gen_num) || a.data.ho_ten.localeCompare(b.data.ho_ten,'vi'));
+  if(!list.length){ box.innerHTML=`<div class="search-empty">Không tìm thấy ai khớp “${escapeHtml(q)}”.</div>`; return; }
+  box.innerHTML = list.slice(0,80).map(d=>{
+    const initial=(d.data.ho_ten||'?').trim().slice(-1).toUpperCase();
+    const meta=[ d.data.doi?('Đời '+d.data.doi):'', d.data.tu?('Tự '+d.data.tu):'', d.data.phap_danh?('PD '+d.data.phap_danh):'' ].filter(Boolean).join(' · ');
+    const gcl=d.data.gender==='F'?'f':(d.data.gender==='M'?'m':'');
+    const av=d.data.anh?` style="background-image:url('${escapeHtml(d.data.anh)}')"`:'';
+    return `<div class="person-row" data-id="${escapeHtml(d.id)}">
+      <div class="p-av ${gcl}"${av}>${d.data.anh?'':escapeHtml(initial)}</div>
+      <div class="p-main"><div class="p-name">${escapeHtml(d.data.ho_ten)}</div><div class="p-meta">${escapeHtml(meta)}</div></div></div>`;
+  }).join('');
+  box.querySelectorAll('.person-row').forEach(r=> r.onclick=()=>{ const p=DATA.find(x=>x.id===r.getAttribute('data-id')); if(p){ closeSearch(); openDetail(p); } });
+}
+function openSearch(){ $('#search-back').classList.add('open'); $('#search').classList.add('open');
+  const i=$('#search-input'); i.value=''; renderSearch(''); setTimeout(()=>i.focus(),50); }
+function closeSearch(){ $('#search-back').classList.remove('open'); $('#search').classList.remove('open'); }
+$('#search-open').onclick = openSearch;
+$('#search-close').onclick = closeSearch;
+$('#search-back').onclick = closeSearch;
+$('#search-input').addEventListener('input', e=> renderSearch(e.target.value));
+
+/* ---- Chọn "xem cây từ đời nào" ---- */
+function openDoi(){
+  const wrap=$('#doi-chips'); if(!wrap) return;
+  const maxDoi=Math.max(1, ...DATA.map(d=>d.data.gen_num||1));
+  let html=`<button class="doi-chip all" data-doi="0">Toàn bộ (từ thuỷ tổ)</button>`;
+  for(let n=1;n<=maxDoi;n++){ if(DATA.some(d=>d.data.gen_num===n)) html+=`<button class="doi-chip" data-doi="${n}">Đời ${intToRoman(n)}</button>`; }
+  wrap.innerHTML=html;
+  wrap.querySelectorAll('.doi-chip').forEach(c=> c.onclick=()=>{ pickDoi(+c.getAttribute('data-doi')); closeDoi(); });
+  $('#doi-back').classList.add('open'); $('#doi').classList.add('open');
+}
+function closeDoi(){ $('#doi-back').classList.remove('open'); $('#doi').classList.remove('open'); }
+function pickDoi(n){
+  if(!CHART) return;
+  let target = ROOT_ID;
+  if(n>0){
+    const cands = DATA.filter(d=> d.data.gen_num===n);
+    const better = cands.filter(d=> d.rels.children.length && isClanMember(d));
+    const pick = better[0] || cands.find(d=>isClanMember(d)) || cands[0];
+    if(pick) target = pick.id;
+  }
+  showTab('tree');
+  CHART.updateMainId(target);
+  CHART.updateTree({tree_position:'fit'});
+}
+$('#btn-doi').onclick = openDoi;
+$('#doi-back').onclick = closeDoi;
 
 load();
 </script>
