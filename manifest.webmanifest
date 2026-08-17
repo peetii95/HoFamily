@@ -1,0 +1,17 @@
+{
+  "name": "Gia phả họ Hồ",
+  "short_name": "Gia phả Hồ",
+  "description": "Cây gia phả trực tuyến họ Hồ — xem quan hệ, ngày giỗ (âm lịch), tên tự và tra cứu dòng họ.",
+  "lang": "vi",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ECE7DA",
+  "theme_color": "#9B2D20",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
