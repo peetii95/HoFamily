@@ -9,6 +9,7 @@
 <!-- PWA: cài ra màn hình chính & chạy offline -->
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#9B2D20" />
+<meta name="referrer" content="no-referrer" />
 <link rel="icon" href="favicon-64.png" sizes="64x64" type="image/png" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <meta name="mobile-web-app-capable" content="yes" />
@@ -171,7 +172,7 @@
   .f3 .gen-sep{ pointer-events:none }
   .f3 .gen-sep-line{ stroke:var(--gold); stroke-width:1.5; stroke-dasharray:5 8; opacity:.55 }
   /* đường nối giữa các thẻ: đổi từ trắng sang đen cho dễ nhìn */
-  .f3 .link{ stroke:var(--ink) !important; stroke-width:1.6px }
+  .f3 .link{ fill:none !important; stroke:#2A2620 !important; stroke-width:2px !important }
 
   /* lớp phủ nhãn đời "dính" — luôn hiển thị dù zoom/kéo */
   #gen-labels{ position:absolute; inset:0; z-index:6; pointer-events:none; overflow:hidden }
@@ -379,8 +380,14 @@
   .tile .d{ font-size:12px; color:var(--ink-soft); margin-top:2px }
 
   /* ---- Danh bạ ---- */
-  .people-head{ padding:12px 14px; font-size:12px; color:var(--ink-soft); position:sticky; top:0;
-    background:rgba(236,231,218,.93); backdrop-filter:blur(6px); border-bottom:1px solid var(--line); z-index:1 }
+  .people-filter{ position:sticky; top:0; z-index:2; display:flex; gap:8px; overflow-x:auto;
+    padding:10px 12px; background:rgba(236,231,218,.96); backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line); scrollbar-width:none }
+  .people-filter::-webkit-scrollbar{ display:none }
+  .pf-chip{ flex:0 0 auto; border:1px solid var(--line); background:var(--card); border-radius:999px;
+    padding:7px 13px; font:inherit; font-size:13px; color:var(--ink); cursor:pointer }
+  .pf-chip.on{ background:var(--cinnabar); color:#F6E6C8; border-color:var(--cinnabar) }
+  .people-head{ padding:10px 14px; font-size:12px; color:var(--ink-soft); border-bottom:1px solid var(--line) }
   .person-row{ display:flex; gap:12px; align-items:center; padding:11px 14px; border-bottom:1px solid var(--line); cursor:pointer }
   .person-row:active{ background:var(--card) }
   .p-av{ flex:0 0 auto; width:42px; height:42px; border-radius:50%; display:grid; place-items:center;
@@ -541,10 +548,10 @@
     <div class="d-sub" id="d-years"></div>
     <span class="d-chip" id="d-gender"></span>
   </div>
-  <div class="d-body" id="d-body"></div>
   <div class="d-actions">
     <button class="btn primary" id="d-focus">Xem cây từ người này</button>
   </div>
+  <div class="d-body" id="d-body"></div>
 </aside>
 
 <div id="banner"></div>
@@ -719,7 +726,7 @@ function driveDirect(url){
   if((m=u.match(/\/file\/d\/([-\w]{15,})/)))                     id=m[1];
   else if((m=u.match(/googleusercontent\.com\/d\/([-\w]{15,})/))) id=m[1];
   else if((m=u.match(/[?&]id=([-\w]{15,})/)))                    id=m[1];
-  if(id) return 'https://drive.google.com/thumbnail?id='+id+'&sz=w400';
+  if(id) return 'https://lh3.googleusercontent.com/d/'+id+'=w600';
   return u;
 }
 function yearsText(b,d){      // dòng năm gọn trên thẻ (chỉ lấy năm dương lịch)
@@ -1395,7 +1402,6 @@ const ICON = {
   calendar:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 3v4M16 3v4"/></svg>'
 };
 
-let TREE_SEEN = false;
 function showTab(name){
   document.body.dataset.tab = name;
   ['home','people','more'].forEach(n=>{
@@ -1405,7 +1411,6 @@ function showTab(name){
   document.querySelectorAll('#navbar .nav-item').forEach(b=> b.classList.toggle('active', b.dataset.tab===name));
   if(name==='tree' && CHART){
     setTimeout(()=>{ try{ CHART.updateTree({tree_position:'fit'}); }catch(_){ } }, 40);
-    if(!TREE_SEEN){ TREE_SEEN = true; setTimeout(openDoi, 260); }   // lần đầu vào tab Cây: hỏi xem từ đời nào
   }
 }
 
@@ -1440,10 +1445,18 @@ function buildHome(){
   el.querySelector('#tile-search').onclick = openSearch;
 }
 
+let PEOPLE_DOI = 0;   // 0 = tất cả
 function buildPeople(){
   const el = document.getElementById('people-list'); if(!el) return;
-  const sorted = [...DATA].sort((a,b)=> (a.data.gen_num - b.data.gen_num) || a.data.ho_ten.localeCompare(b.data.ho_ten,'vi'));
-  const rows = sorted.map(d=>{
+  const maxDoi = Math.max(1, ...DATA.map(d=> d.data.gen_num||1));
+  let chips = `<button class="pf-chip ${PEOPLE_DOI===0?'on':''}" data-doi="0">Tất cả</button>`;
+  for(let n=1;n<=maxDoi;n++){ if(DATA.some(d=>d.data.gen_num===n)) chips += `<button class="pf-chip ${PEOPLE_DOI===n?'on':''}" data-doi="${n}">Đời ${n}</button>`; }
+
+  let list = [...DATA];
+  if(PEOPLE_DOI>0) list = list.filter(d=> d.data.gen_num===PEOPLE_DOI);
+  list.sort((a,b)=> (a.data.gen_num - b.data.gen_num) || a.data.ho_ten.localeCompare(b.data.ho_ten,'vi'));
+
+  const rows = list.map(d=>{
     const initial = (d.data.ho_ten||'?').trim().slice(-1).toUpperCase();
     const meta = [ d.data.doi?('Đời '+d.data.doi):'', d.data.tu?('Tự '+d.data.tu):'' ].filter(Boolean).join(' · ');
     const gcl = d.data.gender==='F'?'f':(d.data.gender==='M'?'m':'');
@@ -1453,7 +1466,12 @@ function buildPeople(){
       <div class="p-main"><div class="p-name">${escapeHtml(d.data.ho_ten)}</div><div class="p-meta">${escapeHtml(meta)}</div></div>
     </div>`;
   }).join('');
-  el.innerHTML = `<div class="people-head">${sorted.length} người · chạm để xem chi tiết</div>` + rows;
+
+  el.innerHTML = `<div class="people-filter">${chips}</div>`
+    + `<div class="people-head">${list.length} người${PEOPLE_DOI?(' · đời '+PEOPLE_DOI):''} · chạm để xem chi tiết</div>`
+    + rows;
+
+  el.querySelectorAll('.pf-chip').forEach(c=> c.onclick=()=>{ PEOPLE_DOI=+c.getAttribute('data-doi'); buildPeople(); document.getElementById('view-people').scrollTop=0; });
   el.querySelectorAll('.person-row').forEach(r=> r.onclick=()=>{ const p=DATA.find(x=>x.id===r.getAttribute('data-id')); if(p) openDetail(p); });
 }
 
@@ -1488,7 +1506,7 @@ $('#search-close').onclick = closeSearch;
 $('#search-back').onclick = closeSearch;
 $('#search-input').addEventListener('input', e=> renderSearch(e.target.value));
 
-/* ---- Chọn "xem cây từ đời nào" ---- */
+/* ---- Xem cây từ một đời: hiển thị TẤT CẢ người của đời đó ---- */
 function openDoi(){
   const wrap=$('#doi-chips'); if(!wrap) return;
   const maxDoi=Math.max(1, ...DATA.map(d=>d.data.gen_num||1));
@@ -1499,18 +1517,39 @@ function openDoi(){
   $('#doi-back').classList.add('open'); $('#doi').classList.add('open');
 }
 function closeDoi(){ $('#doi-back').classList.remove('open'); $('#doi').classList.remove('open'); }
+
+/* Canh khung nhìn để cả một đời (theo trục thế hệ) đều lọt màn hình, đời đó nằm gần mép đầu */
+function focusGen(n){
+  try{
+    const svg=document.querySelector('#FamilyChart svg.main_svg');
+    const view=svg&&svg.querySelector('g.view');
+    const tree=CHART&&CHART.store&&CHART.store.state&&CHART.store.state.tree;
+    if(!svg||!view||!tree||!tree.data) return;
+    const horiz=!!tree.is_horizontal;
+    const nodes=tree.data.filter(t=>t&&t.data&&t.data.data&&t.data.data.gen_num===n&&!t.data.to_add);
+    if(!nodes.length) return;
+    const lvlOf=t=>horiz?t.x:t.y, spanOf=t=>horiz?t.y:t.x;
+    const lvl=lvlOf(nodes[0]);
+    let sMin=Infinity,sMax=-Infinity; nodes.forEach(t=>{const s=spanOf(t); if(s<sMin)sMin=s; if(s>sMax)sMax=s;});
+    const rect=svg.getBoundingClientRect(); const W=rect.width||360, H=rect.height||480;
+    const spanVP=horiz?H:W, lvlVP=horiz?W:H, CARD=240;
+    let k=spanVP/((sMax-sMin)+CARD); k=Math.max(0.14, Math.min(k,0.85));
+    const spanC=(sMin+sMax)/2, lvlMargin=lvlVP*0.20;
+    let tx,ty;
+    if(horiz){ tx=lvlMargin-lvl*k; ty=H/2-spanC*k; }
+    else     { ty=lvlMargin-lvl*k; tx=W/2-spanC*k; }
+    view.setAttribute('transform',`translate(${tx},${ty}) scale(${k})`);
+    if(window.d3 && d3.zoomIdentity){ try{ svg.__zoom=d3.zoomIdentity.translate(tx,ty).scale(k); }catch(_){ } }
+    drawGenSeparators();
+  }catch(_){ }
+}
 function pickDoi(n){
   if(!CHART) return;
-  let target = ROOT_ID;
-  if(n>0){
-    const cands = DATA.filter(d=> d.data.gen_num===n);
-    const better = cands.filter(d=> d.rels.children.length && isClanMember(d));
-    const pick = better[0] || cands.find(d=>isClanMember(d)) || cands[0];
-    if(pick) target = pick.id;
-  }
   showTab('tree');
-  CHART.updateMainId(target);
+  const root = (ROOT_ID && DATA.some(d=>d.id===ROOT_ID)) ? ROOT_ID : (DATA[0]&&DATA[0].id);
+  CHART.updateMainId(root);                          // gốc = thuỷ tổ → cả cây, đầy đủ mọi người mỗi đời
   CHART.updateTree({tree_position:'fit'});
+  if(n>0) setTimeout(()=> focusGen(n), 820);         // rồi canh vào đúng đời để thấy hết đời đó
 }
 $('#btn-doi').onclick = openDoi;
 $('#doi-back').onclick = closeDoi;
