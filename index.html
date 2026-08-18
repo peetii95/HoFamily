@@ -172,7 +172,9 @@
   .f3 .gen-sep{ pointer-events:none }
   .f3 .gen-sep-line{ stroke:var(--gold); stroke-width:1.5; stroke-dasharray:5 8; opacity:.55 }
   /* đường nối giữa các thẻ: đổi từ trắng sang đen cho dễ nhìn */
-  .f3 .link{ fill:none !important; stroke:#163C5F !important; opacity:1 !important }
+  .f3 .link{ display:none !important }                         /* ẩn đường nối mặc định của thư viện */
+  .f3 .links_view{ display:none !important }
+  .f3 .fam-link{ fill:none; stroke:#163C5F; stroke-linecap:round; stroke-linejoin:round }
 
   /* lớp phủ nhãn đời "dính" — luôn hiển thị dù zoom/kéo */
   #gen-labels{ position:absolute; inset:0; z-index:6; pointer-events:none; overflow:hidden }
@@ -477,7 +479,7 @@
     <button class="more-btn" id="btn-backup">Tải bản lưu (.json)</button>
     <button class="more-btn" id="btn-reload">Tải lại dữ liệu (mới nhất)</button>
     <button class="more-btn" id="btn-about">Giới thiệu dòng họ</button>
-    <div class="more-note">Gia phả họ Hồ · phiên bản web</div>
+    <div class="more-note">Gia phả họ Hồ · bản v10</div>
   </div>
 </section>
 
@@ -976,6 +978,26 @@ function drawGenSeparators(){
         ? mk('line',{x1:mid,x2:mid,y1:s1,y2:s2,class:'gen-sep-line'})
         : mk('line',{x1:s1,x2:s2,y1:mid,y2:mid,class:'gen-sep-line'}));
     }
+    // === TỰ VẼ ĐƯỜNG NỐI (không dùng .link của thư viện — vốn không hiện trên một số máy) ===
+    const posMap=new Map();
+    tree.data.forEach(t=>{ if(t&&t.data&&!t.data.to_add&&t.data.id!=null) posMap.set(String(t.data.id),{x:t.x,y:t.y}); });
+    const seenSp=new Set();
+    tree.data.forEach(t=>{
+      if(!t||!t.data||t.data.to_add||t.data.id==null) return;
+      const rels=t.data.rels||{}; const cx=t.x, cy=t.y;
+      const par=(rels.parents||[]).map(id=>posMap.get(String(id))).filter(Boolean);
+      if(par.length){                                   // cha/mẹ → con (từ điểm giữa cặp cha mẹ)
+        const mx=par.reduce((s,p)=>s+p.x,0)/par.length, my=par.reduce((s,p)=>s+p.y,0)/par.length;
+        const dPath = horiz ? `M${mx},${my} H${(mx+cx)/2} V${cy} H${cx}` : `M${mx},${my} V${(my+cy)/2} H${cx} V${cy}`;
+        g.appendChild(mk('path',{d:dPath, class:'fam-link', fill:'none'}));
+      }
+      (rels.spouses||[]).forEach(sid=>{                 // vợ ↔ chồng
+        const key=[String(t.data.id),String(sid)].sort().join('|'); if(seenSp.has(key)) return; seenSp.add(key);
+        const sp=posMap.get(String(sid)); if(!sp) return;
+        g.appendChild(mk('line',{x1:cx,y1:cy,x2:sp.x,y2:sp.y, class:'fam-link'}));
+      });
+    });
+
     view.insertBefore(g, view.firstChild);   // nằm dưới links & cards
 
     // lưu cho lớp phủ nhãn "dính"
@@ -1028,14 +1050,7 @@ function forceLinks(){
   if(!svg||!view) return;
   let k=1; try{ const c=view.transform.baseVal.consolidate(); if(c && c.matrix.a) k=Math.abs(c.matrix.a)||1; }catch(_){ }
   const w=(2.5/k).toFixed(3);                       // độ dày (đơn vị cây) → sau khi *k ≈ 2.5px trên màn hình
-  const links=svg.querySelectorAll('.link');
-  links.forEach(p=>{
-    if(p.getAttribute('fill')!=='none') p.setAttribute('fill','none');
-    if(p.getAttribute('stroke')!=='#163C5F') p.setAttribute('stroke','#163C5F');
-    if(p.getAttribute('stroke-width')!==w) p.setAttribute('stroke-width', w);
-    if(p.getAttribute('vector-effect')) p.removeAttribute('vector-effect');   // KHÔNG dùng non-scaling (lỗi iOS)
-    if(p.style.opacity!=='1') p.style.setProperty('opacity','1','important');
-  });
+  svg.querySelectorAll('.fam-link').forEach(p=>{ if(p.getAttribute('stroke-width')!==w) p.setAttribute('stroke-width', w); });
 }
 if(typeof requestAnimationFrame!=='undefined'){
   (function genLabelLoop(){ syncGenLabels(); forceLinks(); requestAnimationFrame(genLabelLoop); })();
