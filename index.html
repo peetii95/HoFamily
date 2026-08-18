@@ -133,6 +133,8 @@
   /* ------- Khung cây ------- */
   #tree{ position:fixed; top:var(--top); left:0; right:0; bottom:0; }
   .f3{ width:100%; height:100%; }
+  #link-canvas{ position:absolute; inset:0; z-index:0; pointer-events:none }
+  #FamilyChart{ position:relative; z-index:1 }
 
   /* Theme lại thẻ của family-chart cho hợp tông gia phả */
   .f3{
@@ -457,7 +459,7 @@
   </button>
 </header>
 
-<div id="tree"><div class="f3" id="FamilyChart"></div><div id="gen-labels"></div>
+<div id="tree"><canvas id="link-canvas"></canvas><div class="f3" id="FamilyChart"></div><div id="gen-labels"></div>
   <div id="tree-controls">
     <button class="btn" id="btn-root">Về gốc</button>
     <button class="btn" id="btn-doi">Xem từ đời…</button>
@@ -479,7 +481,7 @@
     <button class="more-btn" id="btn-backup">Tải bản lưu (.json)</button>
     <button class="more-btn" id="btn-reload">Tải lại dữ liệu (mới nhất)</button>
     <button class="more-btn" id="btn-about">Giới thiệu dòng họ</button>
-    <div class="more-note">Gia phả họ Hồ · bản v10</div>
+    <div class="more-note">Gia phả họ Hồ · bản v11</div>
   </div>
 </section>
 
@@ -646,7 +648,7 @@ const SAMPLE_ROWS = [
 =========================================================================== */
 const $ = s => document.querySelector(s);
 let CHART = null, CARD = null, DATA = [], ORIENT_V = false, ROOT_ID = '', RAW_ROWS = [];
-let GEN_ROWS = [], GEN_HORIZ = false, GEN_CHIPS = [];
+let GEN_ROWS = [], GEN_HORIZ = false, GEN_CHIPS = [], CONNECTORS = [];
 
 function showBanner(html){ const b=$('#banner'); b.innerHTML=html; b.classList.add('show'); }
 function hideBanner(){ $('#banner').classList.remove('show'); }
@@ -978,27 +980,8 @@ function drawGenSeparators(){
         ? mk('line',{x1:mid,x2:mid,y1:s1,y2:s2,class:'gen-sep-line'})
         : mk('line',{x1:s1,x2:s2,y1:mid,y2:mid,class:'gen-sep-line'}));
     }
-    // === TỰ VẼ ĐƯỜNG NỐI (không dùng .link của thư viện — vốn không hiện trên một số máy) ===
-    const posMap=new Map();
-    tree.data.forEach(t=>{ if(t&&t.data&&!t.data.to_add&&t.data.id!=null) posMap.set(String(t.data.id),{x:t.x,y:t.y}); });
-    const seenSp=new Set();
-    tree.data.forEach(t=>{
-      if(!t||!t.data||t.data.to_add||t.data.id==null) return;
-      const rels=t.data.rels||{}; const cx=t.x, cy=t.y;
-      const par=(rels.parents||[]).map(id=>posMap.get(String(id))).filter(Boolean);
-      if(par.length){                                   // cha/mẹ → con (từ điểm giữa cặp cha mẹ)
-        const mx=par.reduce((s,p)=>s+p.x,0)/par.length, my=par.reduce((s,p)=>s+p.y,0)/par.length;
-        const dPath = horiz ? `M${mx},${my} H${(mx+cx)/2} V${cy} H${cx}` : `M${mx},${my} V${(my+cy)/2} H${cx} V${cy}`;
-        g.appendChild(mk('path',{d:dPath, class:'fam-link', fill:'none'}));
-      }
-      (rels.spouses||[]).forEach(sid=>{                 // vợ ↔ chồng
-        const key=[String(t.data.id),String(sid)].sort().join('|'); if(seenSp.has(key)) return; seenSp.add(key);
-        const sp=posMap.get(String(sid)); if(!sp) return;
-        g.appendChild(mk('line',{x1:cx,y1:cy,x2:sp.x,y2:sp.y, class:'fam-link'}));
-      });
-    });
-
-    view.insertBefore(g, view.firstChild);   // nằm dưới links & cards
+    view.insertBefore(g, view.firstChild);   // vạch ngăn đời (SVG) nằm dưới thẻ
+    rebuildConnectors();                       // cập nhật toạ độ đường nối cho canvas
 
     // lưu cho lớp phủ nhãn "dính"
     GEN_ROWS = arr.map(r=>({k:r.k, doi:r.doi}));
@@ -1045,15 +1028,64 @@ function syncGenLabels(){
   }
 }
 /* Giữ độ dày đường nối ~2px trên màn hình ở mọi mức zoom (thay cho non-scaling-stroke bị lỗi trên iOS) */
-function forceLinks(){
+/* Đọc phép biến đổi (zoom/kéo) hiện tại của cây */
+function viewTransform(){
   const cont=$('#FamilyChart'); const svg=cont&&cont.querySelector('svg.main_svg'); const view=svg&&svg.querySelector('g.view');
-  if(!svg||!view) return;
-  let k=1; try{ const c=view.transform.baseVal.consolidate(); if(c && c.matrix.a) k=Math.abs(c.matrix.a)||1; }catch(_){ }
-  const w=(2.5/k).toFixed(3);                       // độ dày (đơn vị cây) → sau khi *k ≈ 2.5px trên màn hình
-  svg.querySelectorAll('.fam-link').forEach(p=>{ if(p.getAttribute('stroke-width')!==w) p.setAttribute('stroke-width', w); });
+  if(!view) return null;
+  let k=1,tx=0,ty=0; const s=view.getAttribute('transform')||'';
+  const mt=s.match(/translate\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)/); if(mt){ tx=+mt[1]; ty=+mt[2]; }
+  const ms=s.match(/scale\(\s*(-?[\d.]+)/); if(ms) k=+ms[1];
+  if(!mt||!ms){ try{ const c=view.transform.baseVal.consolidate(); if(c){ k=c.matrix.a||k; tx=c.matrix.e; ty=c.matrix.f; } }catch(_){ } }
+  return {k:k||1, tx, ty};
+}
+/* Tính lại toạ độ các đường nối (theo hệ toạ độ cây) từ dữ liệu cây */
+function rebuildConnectors(){
+  const tree=CHART&&CHART.store&&CHART.store.state&&CHART.store.state.tree;
+  if(!tree||!tree.data){ CONNECTORS=[]; return; }
+  const horiz=!!tree.is_horizontal;
+  const pos=new Map(); tree.data.forEach(t=>{ if(t&&t.data&&!t.data.to_add&&t.data.id!=null) pos.set(String(t.data.id),{x:t.x,y:t.y}); });
+  const out=[]; const seen=new Set();
+  tree.data.forEach(t=>{
+    if(!t||!t.data||t.data.to_add||t.data.id==null) return;
+    const rels=t.data.rels||{}; const cx=t.x, cy=t.y;
+    const par=(rels.parents||[]).map(id=>pos.get(String(id))).filter(Boolean);
+    if(par.length){
+      const mx=par.reduce((s,p)=>s+p.x,0)/par.length, my=par.reduce((s,p)=>s+p.y,0)/par.length;
+      out.push({ pts: horiz
+        ? [{x:mx,y:my},{x:(mx+cx)/2,y:my},{x:(mx+cx)/2,y:cy},{x:cx,y:cy}]
+        : [{x:mx,y:my},{x:mx,y:(my+cy)/2},{x:cx,y:(my+cy)/2},{x:cx,y:cy}] });
+    }
+    (rels.spouses||[]).forEach(sid=>{
+      const key=[String(t.data.id),String(sid)].sort().join('|'); if(seen.has(key)) return; seen.add(key);
+      const sp=pos.get(String(sid)); if(!sp) return;
+      out.push({ pts:[{x:cx,y:cy},{x:sp.x,y:sp.y}] });
+    });
+  });
+  CONNECTORS=out;
+}
+/* Vẽ đường nối lên canvas (iOS/WebKit luôn vẽ được canvas) */
+function drawLinkCanvas(){
+  const cv=$('#link-canvas'); const cont=$('#tree'); if(!cv||!cont) return;
+  const tree=CHART&&CHART.store&&CHART.store.state&&CHART.store.state.tree;
+  if(!tree||!tree.data){ return; }
+  if(!CONNECTORS.length) rebuildConnectors();
+  const W=cont.clientWidth, H=cont.clientHeight; if(!W||!H) return;
+  const dpr=window.devicePixelRatio||1;
+  if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); cv.style.width=W+'px'; cv.style.height=H+'px'; }
+  const ctx=cv.getContext('2d'); if(!ctx) return;
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+  const t=viewTransform(); if(!t) return;
+  ctx.strokeStyle='#163C5F'; ctx.lineWidth=2.2; ctx.lineJoin='round'; ctx.lineCap='round';
+  ctx.beginPath();
+  for(const c of CONNECTORS){
+    const p=c.pts; if(!p||!p.length) continue;
+    ctx.moveTo(p[0].x*t.k+t.tx, p[0].y*t.k+t.ty);
+    for(let i=1;i<p.length;i++) ctx.lineTo(p[i].x*t.k+t.tx, p[i].y*t.k+t.ty);
+  }
+  ctx.stroke();
 }
 if(typeof requestAnimationFrame!=='undefined'){
-  (function genLabelLoop(){ syncGenLabels(); forceLinks(); requestAnimationFrame(genLabelLoop); })();
+  (function genLabelLoop(){ syncGenLabels(); drawLinkCanvas(); requestAnimationFrame(genLabelLoop); })();
 }
 
 /* ------- Bảng chi tiết ------- */
