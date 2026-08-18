@@ -30,7 +30,7 @@
     --paper:#ECE7DA;        /* nền giấy cũ, ngả xám ấm */
     --paper-2:#E2DAC7;
     --card:#FBF8F1;         /* mặt thẻ */
-    --ink:#2A2620;          /* mực */
+    --ink:#3E5C76;          /* mực */
     --ink-soft:#6C6354;
     --line:#E0D7C2;
     --cinnabar:#9B2D20;     /* son đỏ — màu dấu triện */
@@ -822,7 +822,7 @@ function transform(rows){
         // tên tự lấy từ cột "Tên tự" (dự phòng: giá trị không-phải-link ở cột "Ảnh")
         tu:      tenTuOf(r),
         // các dòng hiển thị bên phải ảnh trên thẻ (dòng rỗng sẽ tự ẩn)
-        card_tu:  (function(){ const t=tenTuOf(r); return t?('Tự '+t):''; })(),
+        card_tu:  (function(){ const t=tenTuOf(r); return t?(t):''; })(),
         card_sinh:(function(){ const b=yearOf(get(r,COL.birth)), d=yearOf(get(r,COL.death)); return b?('Sinh '+b):(d?('Mất '+d):''); })(),
         // ngày tháng (dương lịch & âm lịch), đã định dạng linh hoạt
         sinh_dl: formatDate(get(r,COL.birth)),
