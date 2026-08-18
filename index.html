@@ -172,8 +172,7 @@
   .f3 .gen-sep{ pointer-events:none }
   .f3 .gen-sep-line{ stroke:var(--gold); stroke-width:1.5; stroke-dasharray:5 8; opacity:.55 }
   /* đường nối giữa các thẻ: đổi từ trắng sang đen cho dễ nhìn */
-  .f3 .link{ fill:none !important; stroke:#2A2620 !important; stroke-width:2px !important; vector-effect:non-scaling-stroke }
-  .f3 path.link{ stroke:#2A2620 !important }
+  .f3 .link{ fill:none !important; stroke:#2A2620 !important; stroke-width:var(--link-sw, 2) !important }
 
   /* lớp phủ nhãn đời "dính" — luôn hiển thị dù zoom/kéo */
   #gen-labels{ position:absolute; inset:0; z-index:6; pointer-events:none; overflow:hidden }
@@ -1023,8 +1022,16 @@ function syncGenLabels(){
     else { chip.style.left='10px'; chip.style.top=pos+'px'; }
   }
 }
+/* Giữ độ dày đường nối ~2px trên màn hình ở mọi mức zoom (thay cho non-scaling-stroke bị lỗi trên iOS) */
+function syncLinkWidth(){
+  const cont=$('#FamilyChart'); const svg=cont&&cont.querySelector('svg.main_svg'); const view=svg&&svg.querySelector('g.view');
+  if(!view) return;
+  let k=1; try{ const c=view.transform.baseVal.consolidate(); if(c && c.matrix.a) k=c.matrix.a; }catch(_){ }
+  const w = 2/(Math.abs(k)||1);            // stroke-width (đơn vị cây) để sau khi *k ≈ 2px
+  document.documentElement.style.setProperty('--link-sw', w.toFixed(3));
+}
 if(typeof requestAnimationFrame!=='undefined'){
-  (function genLabelLoop(){ syncGenLabels(); requestAnimationFrame(genLabelLoop); })();
+  (function genLabelLoop(){ syncGenLabels(); syncLinkWidth(); requestAnimationFrame(genLabelLoop); })();
 }
 
 /* ------- Bảng chi tiết ------- */
