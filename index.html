@@ -172,7 +172,7 @@
   .f3 .gen-sep{ pointer-events:none }
   .f3 .gen-sep-line{ stroke:var(--gold); stroke-width:1.5; stroke-dasharray:5 8; opacity:.55 }
   /* đường nối giữa các thẻ: đổi từ trắng sang đen cho dễ nhìn */
-  .f3 .link{ fill:none !important; stroke:#2A2620 !important; stroke-width:var(--link-sw, 2) !important }
+  .f3 .link{ fill:none !important; stroke:#163C5F !important; stroke-width:var(--link-sw, 2) !important; opacity:1 !important }
 
   /* lớp phủ nhãn đời "dính" — luôn hiển thị dù zoom/kéo */
   #gen-labels{ position:absolute; inset:0; z-index:6; pointer-events:none; overflow:hidden }
@@ -911,7 +911,7 @@ function render(data, mainId){
   const main = mainId || '';
 
   CHART = f3.createChart('#FamilyChart', data)
-    .setTransitionTime(800)
+    .setTransitionTime(0)
     .setCardXSpacing(255)
     .setCardYSpacing(150)
     .setShowSiblingsOfMain(true)
@@ -1558,7 +1558,7 @@ function pickDoi(n){
   const root = (ROOT_ID && DATA.some(d=>d.id===ROOT_ID)) ? ROOT_ID : (DATA[0]&&DATA[0].id);
   CHART.updateMainId(root);                          // gốc = thuỷ tổ → cả cây, đầy đủ mọi người mỗi đời
   CHART.updateTree({tree_position:'fit'});
-  if(n>0) setTimeout(()=> focusGen(n), 820);         // rồi canh vào đúng đời để thấy hết đời đó
+  if(n>0) setTimeout(()=> focusGen(n), 150);         // rồi canh vào đúng đời để thấy hết đời đó
 }
 $('#btn-doi').onclick = openDoi;
 $('#doi-back').onclick = closeDoi;
