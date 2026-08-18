@@ -3,7 +3,7 @@
    - Dữ liệu Google Sheet: ưu tiên mạng (mới nhất), offline dùng bản đã lưu
    - Thư viện CDN, phông chữ, ảnh Drive: dùng cache, ngầm cập nhật
    Đổi số phiên bản khi cập nhật để xoá cache cũ. */
-const VERSION = 'giapha-v7';
+const VERSION = 'giapha-v8';
 const CORE = [
   './', './index.html', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './icon-512-maskable.png',
@@ -55,7 +55,11 @@ self.addEventListener('fetch', e => {
   // 2) Điều hướng trang: cache trước (mở được khi offline), không có thì ra mạng
   if (req.mode === 'navigate') {
     e.respondWith(
-      caches.match('./index.html').then(c => c || fetch(req).catch(() => caches.match('./')))
+      fetch(req).then(res => {
+        const copy = res.clone();
+        caches.open(VERSION).then(c => c.put('./index.html', copy)).catch(() => {});
+        return res;
+      }).catch(() => caches.match('./index.html').then(c => c || caches.match('./')))
     );
     return;
   }

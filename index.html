@@ -172,7 +172,8 @@
   .f3 .gen-sep{ pointer-events:none }
   .f3 .gen-sep-line{ stroke:var(--gold); stroke-width:1.5; stroke-dasharray:5 8; opacity:.55 }
   /* đường nối giữa các thẻ: đổi từ trắng sang đen cho dễ nhìn */
-  .f3 .link{ fill:none !important; stroke:#2A2620 !important; stroke-width:2px !important }
+  .f3 .link{ fill:none !important; stroke:#2A2620 !important; stroke-width:2px !important; vector-effect:non-scaling-stroke }
+  .f3 path.link{ stroke:#2A2620 !important }
 
   /* lớp phủ nhãn đời "dính" — luôn hiển thị dù zoom/kéo */
   #gen-labels{ position:absolute; inset:0; z-index:6; pointer-events:none; overflow:hidden }
@@ -726,7 +727,7 @@ function driveDirect(url){
   if((m=u.match(/\/file\/d\/([-\w]{15,})/)))                     id=m[1];
   else if((m=u.match(/googleusercontent\.com\/d\/([-\w]{15,})/))) id=m[1];
   else if((m=u.match(/[?&]id=([-\w]{15,})/)))                    id=m[1];
-  if(id) return 'https://lh3.googleusercontent.com/d/'+id+'=w600';
+  if(id) return 'https://drive.google.com/thumbnail?id='+id+'&sz=w600';
   return u;
 }
 function yearsText(b,d){      // dòng năm gọn trên thẻ (chỉ lấy năm dương lịch)
@@ -1081,7 +1082,8 @@ function openDetail(datum){
   if(!rowsInfo.length) rowsInfo.push(['Thông tin','Chưa có ghi chép thêm.']);
   body.innerHTML = rowsInfo.map(([k,v])=>`<div class="d-row"><div class="k">${k}</div><div class="v">${escapeHtml(v)}</div></div>`).join('');
 
-  $('#d-focus').onclick = ()=>{ showTab('tree'); if(CHART){ CHART.updateMainId(datum.id); CHART.updateTree({tree_position:'main_to_middle'});} closeDetail(); };
+  $('#d-focus').onclick = ()=>{ const id=datum.id; closeDetail(); showTab('tree', true);
+    setTimeout(()=>{ if(CHART){ CHART.updateMainId(id); CHART.updateTree({tree_position:'main_to_middle'}); } }, 80); };
 
   const panel=$('#detail'); panel.classList.add('open'); panel.setAttribute('aria-hidden','false');
 }
@@ -1402,14 +1404,14 @@ const ICON = {
   calendar:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 3v4M16 3v4"/></svg>'
 };
 
-function showTab(name){
+function showTab(name, skipFit){
   document.body.dataset.tab = name;
   ['home','people','more'].forEach(n=>{
     const v = document.getElementById('view-'+n);
     if(v){ const on = (n===name); v.classList.toggle('active', on); if(on) v.scrollTop=0; }
   });
   document.querySelectorAll('#navbar .nav-item').forEach(b=> b.classList.toggle('active', b.dataset.tab===name));
-  if(name==='tree' && CHART){
+  if(name==='tree' && CHART && !skipFit){
     setTimeout(()=>{ try{ CHART.updateTree({tree_position:'fit'}); }catch(_){ } }, 40);
   }
 }
@@ -1545,7 +1547,7 @@ function focusGen(n){
 }
 function pickDoi(n){
   if(!CHART) return;
-  showTab('tree');
+  showTab('tree', true);
   const root = (ROOT_ID && DATA.some(d=>d.id===ROOT_ID)) ? ROOT_ID : (DATA[0]&&DATA[0].id);
   CHART.updateMainId(root);                          // gốc = thuỷ tổ → cả cây, đầy đủ mọi người mỗi đời
   CHART.updateTree({tree_position:'fit'});
