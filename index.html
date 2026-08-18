@@ -30,7 +30,7 @@
     --paper:#ECE7DA;        /* nền giấy cũ, ngả xám ấm */
     --paper-2:#E2DAC7;
     --card:#FBF8F1;         /* mặt thẻ */
-    --ink:#3E5C76;          /* mực */
+    --ink:#2A2620;          /* mực */
     --ink-soft:#6C6354;
     --line:#E0D7C2;
     --cinnabar:#9B2D20;     /* son đỏ — màu dấu triện */
@@ -172,7 +172,7 @@
   .f3 .gen-sep{ pointer-events:none }
   .f3 .gen-sep-line{ stroke:var(--gold); stroke-width:1.5; stroke-dasharray:5 8; opacity:.55 }
   /* đường nối giữa các thẻ: đổi từ trắng sang đen cho dễ nhìn */
-  .f3 .link{ fill:none !important; stroke:#163C5F !important; stroke-width:var(--link-sw, 2) !important; opacity:1 !important }
+  .f3 .link{ fill:none !important; stroke:#163C5F !important; opacity:1 !important }
 
   /* lớp phủ nhãn đời "dính" — luôn hiển thị dù zoom/kéo */
   #gen-labels{ position:absolute; inset:0; z-index:6; pointer-events:none; overflow:hidden }
@@ -822,7 +822,7 @@ function transform(rows){
         // tên tự lấy từ cột "Tên tự" (dự phòng: giá trị không-phải-link ở cột "Ảnh")
         tu:      tenTuOf(r),
         // các dòng hiển thị bên phải ảnh trên thẻ (dòng rỗng sẽ tự ẩn)
-        card_tu:  (function(){ const t=tenTuOf(r); return t?(t):''; })(),
+        card_tu:  (function(){ const t=tenTuOf(r); return t?('Tự '+t):''; })(),
         card_sinh:(function(){ const b=yearOf(get(r,COL.birth)), d=yearOf(get(r,COL.death)); return b?('Sinh '+b):(d?('Mất '+d):''); })(),
         // ngày tháng (dương lịch & âm lịch), đã định dạng linh hoạt
         sinh_dl: formatDate(get(r,COL.birth)),
@@ -1023,15 +1023,22 @@ function syncGenLabels(){
   }
 }
 /* Giữ độ dày đường nối ~2px trên màn hình ở mọi mức zoom (thay cho non-scaling-stroke bị lỗi trên iOS) */
-function syncLinkWidth(){
+function forceLinks(){
   const cont=$('#FamilyChart'); const svg=cont&&cont.querySelector('svg.main_svg'); const view=svg&&svg.querySelector('g.view');
-  if(!view) return;
-  let k=1; try{ const c=view.transform.baseVal.consolidate(); if(c && c.matrix.a) k=c.matrix.a; }catch(_){ }
-  const w = 2/(Math.abs(k)||1);            // stroke-width (đơn vị cây) để sau khi *k ≈ 2px
-  document.documentElement.style.setProperty('--link-sw', w.toFixed(3));
+  if(!svg||!view) return;
+  let k=1; try{ const c=view.transform.baseVal.consolidate(); if(c && c.matrix.a) k=Math.abs(c.matrix.a)||1; }catch(_){ }
+  const w=(2.5/k).toFixed(3);                       // độ dày (đơn vị cây) → sau khi *k ≈ 2.5px trên màn hình
+  const links=svg.querySelectorAll('.link');
+  links.forEach(p=>{
+    if(p.getAttribute('fill')!=='none') p.setAttribute('fill','none');
+    if(p.getAttribute('stroke')!=='#163C5F') p.setAttribute('stroke','#163C5F');
+    if(p.getAttribute('stroke-width')!==w) p.setAttribute('stroke-width', w);
+    if(p.getAttribute('vector-effect')) p.removeAttribute('vector-effect');   // KHÔNG dùng non-scaling (lỗi iOS)
+    if(p.style.opacity!=='1') p.style.setProperty('opacity','1','important');
+  });
 }
 if(typeof requestAnimationFrame!=='undefined'){
-  (function genLabelLoop(){ syncGenLabels(); syncLinkWidth(); requestAnimationFrame(genLabelLoop); })();
+  (function genLabelLoop(){ syncGenLabels(); forceLinks(); requestAnimationFrame(genLabelLoop); })();
 }
 
 /* ------- Bảng chi tiết ------- */
