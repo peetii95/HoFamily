@@ -481,7 +481,7 @@
     <button class="more-btn" id="btn-backup">Tải bản lưu (.json)</button>
     <button class="more-btn" id="btn-reload">Tải lại dữ liệu (mới nhất)</button>
     <button class="more-btn" id="btn-about">Giới thiệu dòng họ</button>
-    <div class="more-note">Gia phả họ Hồ · bản v11</div>
+    <div class="more-note">Gia phả họ Hồ · bản v12</div>
   </div>
 </section>
 
@@ -1005,9 +1005,9 @@ function buildGenChips(){
 /* Mỗi khung hình: đặt nhãn đời dính ở mép màn hình theo vị trí dải đời hiện tại */
 function syncGenLabels(){
   const overlay=$('#gen-labels'); if(!overlay || !GEN_ROWS.length || !GEN_CHIPS.length) return;
-  const cont=$('#FamilyChart'); const svg=cont&&cont.querySelector('svg.main_svg'); const view=svg&&svg.querySelector('g.view');
-  if(!view) return;
-  let M; try{ const c=view.transform.baseVal.consolidate(); if(!c) return; M=c.matrix; }catch(_){ return; }
+  const cont=$('#FamilyChart'); if(!cont) return;
+  const vt=viewTransform(); if(!vt) return;
+  const M={a:vt.k, d:vt.k, e:vt.tx, f:vt.ty};
   const k = GEN_HORIZ ? M.a : M.d;
   const t = GEN_HORIZ ? M.e : M.f;
   const W = cont.clientWidth, H = cont.clientHeight;
@@ -1028,15 +1028,23 @@ function syncGenLabels(){
   }
 }
 /* Giữ độ dày đường nối ~2px trên màn hình ở mọi mức zoom (thay cho non-scaling-stroke bị lỗi trên iOS) */
-/* Đọc phép biến đổi (zoom/kéo) hiện tại của cây */
+/* Đọc phép biến đổi (zoom/kéo) hiện tại của cây.
+   family-chart áp zoom bằng CSS style.transform="translate(Xpx, Ypx) scale(K)" trên g.view
+   và div.cards_view — nên phải đọc từ style, không phải thuộc tính SVG. */
 function viewTransform(){
-  const cont=$('#FamilyChart'); const svg=cont&&cont.querySelector('svg.main_svg'); const view=svg&&svg.querySelector('g.view');
-  if(!view) return null;
-  let k=1,tx=0,ty=0; const s=view.getAttribute('transform')||'';
-  const mt=s.match(/translate\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)/); if(mt){ tx=+mt[1]; ty=+mt[2]; }
-  const ms=s.match(/scale\(\s*(-?[\d.]+)/); if(ms) k=+ms[1];
-  if(!mt||!ms){ try{ const c=view.transform.baseVal.consolidate(); if(c){ k=c.matrix.a||k; tx=c.matrix.e; ty=c.matrix.f; } }catch(_){ } }
-  return {k:k||1, tx, ty};
+  const cont=$('#FamilyChart'); if(!cont) return null;
+  const el = cont.querySelector('div.cards_view') || cont.querySelector('svg.main_svg g.view');
+  if(!el) return null;
+  const s = (el.style && el.style.transform) || el.getAttribute('transform') || '';
+  let k=1,tx=0,ty=0, ok=false;
+  let m = s.match(/translate\(\s*(-?[\d.]+)(?:px)?[ ,]+(-?[\d.]+)(?:px)?\s*\)\s*scale\(\s*(-?[\d.]+)/);
+  if(m){ tx=+m[1]; ty=+m[2]; k=+m[3]; ok=true; }
+  if(!ok){
+    const mm = s.match(/matrix\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)[ ,]+(-?[\d.]+)[ ,]+(-?[\d.]+)[ ,]+(-?[\d.]+)[ ,]+(-?[\d.]+)/);
+    if(mm){ k=+mm[1]; tx=+mm[5]; ty=+mm[6]; ok=true; }
+  }
+  if(!ok){ try{ const c=el.transform&&el.transform.baseVal&&el.transform.baseVal.consolidate(); if(c){ k=c.matrix.a||1; tx=c.matrix.e; ty=c.matrix.f; ok=true; } }catch(_){ } }
+  return ok ? {k:k||1, tx, ty} : null;
 }
 /* Tính lại toạ độ các đường nối (theo hệ toạ độ cây) từ dữ liệu cây */
 function rebuildConnectors(){
@@ -1601,7 +1609,10 @@ function focusGen(n){
     let tx,ty;
     if(horiz){ tx=lvlMargin-lvl*k; ty=H/2-spanC*k; }
     else     { ty=lvlMargin-lvl*k; tx=W/2-spanC*k; }
-    view.setAttribute('transform',`translate(${tx},${ty}) scale(${k})`);
+    const css=`translate(${tx}px, ${ty}px) scale(${k})`;
+    view.style.transform=css;                                     // lớp SVG (vạch ngăn đời)
+    const hv=document.querySelector('#FamilyChart div.cards_view');
+    if(hv) hv.style.transform=css;                                // lớp thẻ HTML
     if(window.d3 && d3.zoomIdentity){ try{ svg.__zoom=d3.zoomIdentity.translate(tx,ty).scale(k); }catch(_){ } }
     drawGenSeparators();
   }catch(_){ }
