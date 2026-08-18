@@ -517,7 +517,7 @@
     <button class="more-btn" id="btn-backup">Tải bản lưu (.json)</button>
     <button class="more-btn" id="btn-reload">Tải lại dữ liệu (mới nhất)</button>
     <button class="more-btn" id="btn-about">Giới thiệu dòng họ</button>
-    <div class="more-note">Gia phả họ Hồ · bản v13</div>
+    <div class="more-note">Gia phả họ Hồ · bản v14</div>
   </div>
 </section>
 
@@ -634,7 +634,7 @@ const CONFIG = {
   FAMILY_NAME: "Gia phả họ Hồ",
   SEAL: "胡",                    // chữ Hán/ký tự trên dấu triện (họ Hồ = 胡)
   // Nhận YÊU CẦU chỉnh sửa/thêm người:
-  REQUEST_URL: "https://script.google.com/macros/s/AKfycbyR26UbDsBp6pDh83yanmWU2myudyv38YOFhcXcpitu6f15Gv5dHB0AKbRjFKmF-5Lsrw/exec",               // <-- dán URL Web App (Google Apps Script) sau khi triển khai; xem hướng dẫn kèm theo
+  REQUEST_URL: "",               // <-- dán URL Web App (Google Apps Script) sau khi triển khai; xem hướng dẫn kèm theo
   REQUEST_EMAIL: "",             // <-- dự phòng: nếu chưa có URL, yêu cầu sẽ mở email gửi tới địa chỉ này
 };
 
@@ -1105,17 +1105,31 @@ function rebuildConnectors(){
   const tree=CHART&&CHART.store&&CHART.store.state&&CHART.store.state.tree;
   if(!tree||!tree.data){ CONNECTORS=[]; return; }
   const horiz=!!tree.is_horizontal;
-  const pos=new Map(); tree.data.forEach(t=>{ if(t&&t.data&&!t.data.to_add&&t.data.id!=null) pos.set(String(t.data.id),{x:t.x,y:t.y}); });
+  const pos=new Map(), relsOf=new Map();
+  tree.data.forEach(t=>{ if(t&&t.data&&!t.data.to_add&&t.data.id!=null){ pos.set(String(t.data.id),{x:t.x,y:t.y}); relsOf.set(String(t.data.id), t.data.rels||{}); } });
+  const spN = id => ((relsOf.get(String(id))||{}).spouses||[]).length;
   const out=[]; const seen=new Set();
   tree.data.forEach(t=>{
     if(!t||!t.data||t.data.to_add||t.data.id==null) return;
     const rels=t.data.rels||{}; const cx=t.x, cy=t.y;
-    const par=(rels.parents||[]).map(id=>pos.get(String(id))).filter(Boolean);
-    if(par.length){
-      const mx=par.reduce((s,p)=>s+p.x,0)/par.length, my=par.reduce((s,p)=>s+p.y,0)/par.length;
+    const pids=(rels.parents||[]).map(String).filter(id=>pos.has(id));
+    if(pids.length){
+      // ĐIỂM XUẤT PHÁT của dây cha/mẹ → con:
+      //  - cha/mẹ đơn: từ thẻ người đó
+      //  - cặp 1 vợ 1 chồng: từ điểm giữa hai người
+      //  - chồng NHIỀU vợ: từ thẻ của ĐÚNG bà vợ (mẹ của người con này)
+      let ax, ay;
+      if(pids.length===1){ const p=pos.get(pids[0]); ax=p.x; ay=p.y; }
+      else {
+        const n0=spN(pids[0]), n1=spN(pids[1]);
+        const p0=pos.get(pids[0]), p1=pos.get(pids[1]);
+        if(n0>1 && n1<=1){ ax=p1.x; ay=p1.y; }        // cha nhiều vợ → nối từ mẹ
+        else if(n1>1 && n0<=1){ ax=p0.x; ay=p0.y; }   // mẹ nhiều chồng → nối từ cha
+        else { ax=(p0.x+p1.x)/2; ay=(p0.y+p1.y)/2; }  // cặp đơn → điểm giữa
+      }
       out.push({ pts: horiz
-        ? [{x:mx,y:my},{x:(mx+cx)/2,y:my},{x:(mx+cx)/2,y:cy},{x:cx,y:cy}]
-        : [{x:mx,y:my},{x:mx,y:(my+cy)/2},{x:cx,y:(my+cy)/2},{x:cx,y:cy}] });
+        ? [{x:ax,y:ay},{x:(ax+cx)/2,y:ay},{x:(ax+cx)/2,y:cy},{x:cx,y:cy}]
+        : [{x:ax,y:ay},{x:ax,y:(ay+cy)/2},{x:cx,y:(ay+cy)/2},{x:cx,y:cy}] });
     }
     (rels.spouses||[]).forEach(sid=>{
       const key=[String(t.data.id),String(sid)].sort().join('|'); if(seen.has(key)) return; seen.add(key);
@@ -1692,13 +1706,13 @@ const REQ_FIELDS = [
   {h:'Họ tên',                      col:COL.name,        req:true},
   {h:'Giới tính',                   col:COL.gender,      type:'select', opts:['','Nam','Nữ']},
   {h:'Năm sinh',                    col:COL.birth},
-  {h:'Năm mất',                     col:COL.death,      hint:'để trống nếu còn sống'},
+  {h:'Năm mất',                     col:COL.death,       hint:'để trống nếu còn sống'},
   {h:'(ÂL) Năm sinh',               col:COL.birth_al},
-  {h:'(ÂL) Năm mất',                col:COL.death_al,    hint:'vd 24-10 Mậu Tuất'},
-  {h:'Đời',                         col:COL.gen,        hint:'để trống nếu không rõ'},  
-  {h:'ID cha',                      col:COL.father,      hint:'để trống nếu không rõ'},
-  {h:'ID mẹ',                       col:COL.mother,      hint:'để trống nếu không rõ'},
-  {h:'ID vợ/chồng',                 col:COL.spouses,     hint:'nhiều người thì cách nhau dấu phẩy'},
+  {h:'(ÂL) Năm mất',                col:COL.death_al,    hint:'vd 24-10 Mậu Tuất — dùng để tính ngày giỗ'},
+  {h:'Đời',                         col:COL.gen},
+  {h:'ID cha',                      col:COL.father,       hint:'để trống nếu không rõ'},
+  {h:'ID mẹ',                       col:COL.mother,       hint:'để trống nếu không rõ'},
+  {h:'ID vợ/chồng',                 col:COL.spouses,     hint:'để trống nếu không rõ'},
   {h:'Ảnh',                         col:COL.photo,       hint:'dán link ảnh Google Drive (đã chia sẻ công khai)'},
   {h:'Tên tự',                      col:COL.ten_tu},
   {h:'Pháp danh',                   col:COL.phap_danh},
@@ -1711,7 +1725,7 @@ const REQ_FIELDS = [
   {h:'Con',                         col:COL.note_con,    type:'textarea', sec:'Ghi chú quan hệ'},
   {h:'Cha',                         col:COL.note_cha},
   {h:'Mẹ',                          col:COL.note_me},
-  {h:'Các anh chị em của Cha/mẹ',   col:COL.note_bac,    type:'textarea'},
+  {h:'Các anh chị em của Cha/mẹ',   col:COL.note_bac,    type:'textarea', hint:'Cô dì chú bác của người được thêm/sửa'},
 ];
 
 function openEditMenu(){ $('#edit-back').classList.add('open'); $('#editmenu').classList.add('open'); }
