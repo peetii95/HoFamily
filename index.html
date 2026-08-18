@@ -439,6 +439,42 @@
     font:inherit; font-size:14px; color:var(--ink); cursor:pointer; text-align:center }
   .doi-chip.all{ grid-column:1/-1; font-weight:600; color:var(--cinnabar); border-color:#e6c3bd; background:#FBF2F0 }
   .doi-chip:active{ border-color:var(--gold) }
+  /* ---- Menu "Chỉnh sửa" (tấm trượt đáy) ---- */
+  #edit-back{ position:fixed; inset:0; z-index:60; background:rgba(34,30,24,.38); display:none }
+  #edit-back.open{ display:block }
+  #editmenu{ position:fixed; z-index:61; left:0; right:0; bottom:0; display:none;
+    background:linear-gradient(180deg,#FCFAF4,#F6F1E6); border-top:1px solid var(--line);
+    border-radius:18px 18px 0 0; box-shadow:0 -14px 44px rgba(42,38,32,.24);
+    padding:18px 16px calc(20px + env(safe-area-inset-bottom,0px)) }
+  #editmenu.open{ display:block }
+  #editmenu::before{ content:""; position:absolute; top:8px; left:50%; transform:translateX(-50%); width:44px; height:5px; border-radius:3px; background:var(--line) }
+  .em-head{ font-family:'Noto Serif',serif; font-size:17px; margin:8px 2px 14px }
+  .em-btn{ width:100%; text-align:left; background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:14px 16px; font:inherit; color:var(--ink); cursor:pointer; margin-bottom:10px }
+  .em-btn .t{ font-size:15px; font-weight:700 }
+  .em-btn .d{ font-size:12.5px; color:var(--ink-soft); margin-top:2px }
+
+  /* ---- Form yêu cầu (toàn màn hình) ---- */
+  #reqform{ position:fixed; inset:0; z-index:70; background:var(--paper); display:none; flex-direction:column }
+  #reqform.open{ display:flex }
+  .rf-bar{ display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--line); background:var(--card);
+    padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px }
+  .rf-title{ font-family:'Noto Serif',serif; font-size:17px; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+  #rf-body{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:14px 14px calc(26px + env(safe-area-inset-bottom,0px)) }
+  .rf-sec{ font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--cinnabar); font-weight:700; margin:18px 2px 8px }
+  .rf-sec:first-child{ margin-top:2px }
+  .rf-field{ margin-bottom:11px }
+  .rf-field label{ display:block; font-size:12.5px; color:var(--ink-soft); margin:0 2px 4px }
+  .rf-field input, .rf-field select, .rf-field textarea{
+    width:100%; box-sizing:border-box; font:inherit; font-size:15px; color:var(--ink);
+    background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 12px }
+  .rf-field textarea{ min-height:64px; resize:vertical }
+  .rf-field.changed input, .rf-field.changed select, .rf-field.changed textarea{ border-color:var(--gold); background:#FFFDF4 }
+  .rf-note{ font-size:12.5px; color:var(--ink-soft); background:var(--card); border:1px dashed var(--line); border-radius:10px; padding:10px 12px; margin-bottom:12px }
+  .rf-send{ width:100%; border:0; border-radius:12px; background:var(--cinnabar); color:#F6E6C8;
+    font:inherit; font-size:16px; font-weight:700; padding:14px; cursor:pointer; margin-top:8px }
+  .rf-send:disabled{ opacity:.55 }
+  .rf-pick .person-row{ border-radius:12px; border:1px solid var(--line); margin-bottom:8px; background:var(--card) }
 </style>
 </head>
 <body>
@@ -481,7 +517,7 @@
     <button class="more-btn" id="btn-backup">Tải bản lưu (.json)</button>
     <button class="more-btn" id="btn-reload">Tải lại dữ liệu (mới nhất)</button>
     <button class="more-btn" id="btn-about">Giới thiệu dòng họ</button>
-    <div class="more-note">Gia phả họ Hồ · bản v12</div>
+    <div class="more-note">Gia phả họ Hồ · bản v13</div>
   </div>
 </section>
 
@@ -501,6 +537,21 @@
     <button id="search-close" class="s-close">Đóng</button>
   </div>
   <div id="search-results"></div>
+</div>
+
+<div id="edit-back"></div>
+<div id="editmenu">
+  <div class="em-head">Đề xuất chỉnh sửa gia phả</div>
+  <button class="em-btn" id="em-add"><div class="t">Thêm</div><div class="d">Thêm người chưa có trong cây</div></button>
+  <button class="em-btn" id="em-edit"><div class="t">Chỉnh sửa</div><div class="d">Sửa thông tin người đã có trong cây</div></button>
+</div>
+
+<div id="reqform">
+  <div class="rf-bar">
+    <div class="rf-title" id="rf-title">Yêu cầu</div>
+    <button id="rf-close" class="s-close">Đóng</button>
+  </div>
+  <div id="rf-body"></div>
 </div>
 
 <div id="doi-back"></div>
@@ -582,6 +633,9 @@ const CONFIG = {
   ROOT_ID:  "",
   FAMILY_NAME: "Gia phả họ Hồ",
   SEAL: "胡",                    // chữ Hán/ký tự trên dấu triện (họ Hồ = 胡)
+  // Nhận YÊU CẦU chỉnh sửa/thêm người:
+  REQUEST_URL: "https://script.google.com/macros/s/AKfycbyR26UbDsBp6pDh83yanmWU2myudyv38YOFhcXcpitu6f15Gv5dHB0AKbRjFKmF-5Lsrw/exec",               // <-- dán URL Web App (Google Apps Script) sau khi triển khai; xem hướng dẫn kèm theo
+  REQUEST_EMAIL: "",             // <-- dự phòng: nếu chưa có URL, yêu cầu sẽ mở email gửi tới địa chỉ này
 };
 
 /* Tên cột trong Sheet (đổi ở đây nếu bạn đặt tên cột khác) */
@@ -1470,7 +1524,8 @@ const ICON = {
   tree:'<svg viewBox="0 0 24 24"><rect x="9.5" y="3" width="5" height="4" rx="1"/><rect x="3.5" y="16" width="5" height="4" rx="1"/><rect x="15.5" y="16" width="5" height="4" rx="1"/><path d="M12 7v3M6 16v-3h12v3"/></svg>',
   users:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c0-3 2.6-4.8 5.5-4.8s5.5 1.8 5.5 4.8"/><path d="M16 5.2a3 3 0 0 1 0 5.6"/><path d="M20.5 19c0-2.3-1.6-3.9-3.7-4.4"/></svg>',
   swap:'<svg viewBox="0 0 24 24"><path d="M7 8h11M7 8l3-3M7 8l3 3M17 16H6M17 16l-3-3M17 16l-3 3"/></svg>',
-  calendar:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 3v4M16 3v4"/></svg>'
+  calendar:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 3v4M16 3v4"/></svg>',
+  pen:'<svg viewBox="0 0 24 24"><path d="M4 20l4.5-1 11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20z"/><path d="M13.5 6.5l3 3"/></svg>'
 };
 
 function showTab(name, skipFit){
@@ -1506,14 +1561,14 @@ function buildHome(){
       <button class="tile" id="tile-tree">${ICON.tree}<div class="t">Xem cây</div><div class="d">Toàn bộ dòng họ</div></button>
       <button class="tile" id="tile-people">${ICON.users}<div class="t">Danh bạ</div><div class="d">Danh sách mọi người</div></button>
       <button class="tile" id="tile-rel">${ICON.swap}<div class="t">Tra quan hệ</div><div class="d">Giữa hai người</div></button>
-      <button class="tile" id="tile-search">${ICON.search}<div class="t">Tìm người</div><div class="d">Theo tên, tên tự…</div></button>
+      <button class="tile" id="tile-edit">${ICON.pen}<div class="t">Chỉnh sửa</div><div class="d">Đề xuất thêm / sửa thông tin</div></button>
     </div>`;
 
   el.querySelector('#home-search').onclick = openSearch;
   el.querySelector('#tile-tree').onclick   = ()=> showTab('tree');
   el.querySelector('#tile-people').onclick = ()=> showTab('people');
   el.querySelector('#tile-rel').onclick    = openRel;
-  el.querySelector('#tile-search').onclick = openSearch;
+  el.querySelector('#tile-edit').onclick   = openEditMenu;
 }
 
 let PEOPLE_DOI = 0;   // 0 = tất cả
@@ -1627,6 +1682,157 @@ function pickDoi(n){
 }
 $('#btn-doi').onclick = openDoi;
 $('#doi-back').onclick = closeDoi;
+
+/* ============================================================
+   YÊU CẦU CHỈNH SỬA / THÊM NGƯỜI  (gửi về tab "YeuCau" trong Sheet)
+============================================================ */
+/* Danh sách trường = đúng các cột trong Google Sheet */
+const REQ_FIELDS = [
+  {h:'ID',                          col:COL.id,          hint:'vd 12-3 (đời-số); để trống nếu chưa rõ'},
+  {h:'Họ tên',                      col:COL.name,        req:true},
+  {h:'Giới tính',                   col:COL.gender,      type:'select', opts:['','Nam','Nữ']},
+  {h:'Năm sinh',                    col:COL.birth},
+  {h:'Năm mất',                     col:COL.death},
+  {h:'(ÂL) Năm sinh',               col:COL.birth_al},
+  {h:'(ÂL) Năm mất',                col:COL.death_al,    hint:'vd 24-10 Mậu Tuất — dùng để tính ngày giỗ'},
+  {h:'Đời',                         col:COL.gen},
+  {h:'ID cha',                      col:COL.father},
+  {h:'ID mẹ',                       col:COL.mother},
+  {h:'ID vợ/chồng',                 col:COL.spouses,     hint:'nhiều người thì cách nhau dấu phẩy'},
+  {h:'Ảnh',                         col:COL.photo,       hint:'dán link ảnh Google Drive (đã chia sẻ công khai)'},
+  {h:'Tên tự',                      col:COL.ten_tu},
+  {h:'Pháp danh',                   col:COL.phap_danh},
+  {h:'Nguyên quán (nơi sinh)',      col:COL.nguyen_quan, type:'textarea'},
+  {h:'Định cư',                     col:COL.dinh_cu,     type:'textarea'},
+  {h:'Nghề nghiệp/Công danh',       col:COL.nghe_nghiep, type:'textarea'},
+  {h:'Người phụng tế',              col:COL.nguoi_phung_te},
+  {h:'Mãn phần (nơi mất)',          col:COL.man_phan,    type:'textarea'},
+  {h:'Ghi chú',                     col:COL.note,        type:'textarea'},
+  {h:'Con',                         col:COL.note_con,    type:'textarea', sec:'Ghi chú quan hệ (không bắt buộc)'},
+  {h:'Cha',                         col:COL.note_cha},
+  {h:'Mẹ',                          col:COL.note_me},
+  {h:'Các anh chị em của Cha/mẹ',   col:COL.note_bac,    type:'textarea'},
+];
+
+function openEditMenu(){ $('#edit-back').classList.add('open'); $('#editmenu').classList.add('open'); }
+function closeEditMenu(){ $('#edit-back').classList.remove('open'); $('#editmenu').classList.remove('open'); }
+$('#edit-back').onclick = closeEditMenu;
+$('#em-add').onclick  = ()=>{ closeEditMenu(); openReqForm('them', null); };
+$('#em-edit').onclick = ()=>{ closeEditMenu(); openReqPicker(); };
+$('#rf-close').onclick = ()=>{ $('#reqform').classList.remove('open'); };
+
+/* Bước chọn người (cho "Chỉnh sửa") */
+function openReqPicker(){
+  $('#rf-title').textContent = 'Chọn người cần sửa';
+  const body=$('#rf-body');
+  body.innerHTML = `<div class="rf-field"><input id="rf-pick-q" type="search" placeholder="Tìm theo tên, tên tự, pháp danh…" autocomplete="off"/></div><div class="rf-pick" id="rf-pick-list"></div>`;
+  const renderList=(q)=>{
+    const nq=noAccent(q||'').trim();
+    let list=[...DATA];
+    if(nq) list=list.filter(d=>{ const hay=noAccent([d.data.ho_ten,d.data.tu,d.data.phap_danh].filter(Boolean).join(' ')); return hay.includes(nq); });
+    list.sort((a,b)=>(a.data.gen_num-b.data.gen_num)||a.data.ho_ten.localeCompare(b.data.ho_ten,'vi'));
+    $('#rf-pick-list').innerHTML = list.slice(0,80).map(d=>{
+      const initial=(d.data.ho_ten||'?').trim().slice(-1).toUpperCase();
+      const meta=[d.data.doi?('Đời '+d.data.doi):'', d.id?('ID '+d.id):''].filter(Boolean).join(' · ');
+      const gcl=d.data.gender==='F'?'f':(d.data.gender==='M'?'m':'');
+      return `<div class="person-row" data-id="${escapeHtml(d.id)}"><div class="p-av ${gcl}">${escapeHtml(initial)}</div>
+        <div class="p-main"><div class="p-name">${escapeHtml(d.data.ho_ten)}</div><div class="p-meta">${escapeHtml(meta)}</div></div></div>`;
+    }).join('') || `<div class="search-empty">Không tìm thấy ai.</div>`;
+    $('#rf-pick-list').querySelectorAll('.person-row').forEach(r=> r.onclick=()=>{ const p=DATA.find(x=>x.id===r.getAttribute('data-id')); if(p) openReqForm('sua', p); });
+  };
+  renderList('');
+  $('#rf-pick-q').addEventListener('input', e=> renderList(e.target.value));
+  $('#reqform').classList.add('open');
+}
+
+/* Lấy dòng dữ liệu gốc trong Sheet của một người (để điền sẵn form sửa) */
+function rawRowOf(personId){
+  return (RAW_ROWS||[]).find(r=> normId(get(r,COL.id))===personId) || null;
+}
+
+/* Form thêm/sửa */
+function openReqForm(mode, person){
+  const raw = person ? rawRowOf(person.id) : null;
+  $('#rf-title').textContent = mode==='them' ? 'Yêu cầu: Thêm người mới' : ('Yêu cầu: Sửa — '+(person?person.data.ho_ten:''));
+  const body=$('#rf-body');
+  let html = `<div class="rf-note">${ mode==='them'
+      ? 'Điền thông tin người cần thêm (không bắt buộc điền hết). Yêu cầu sẽ được gửi tới người quản lý gia phả để duyệt.'
+      : 'Sửa trực tiếp vào các ô cần thay đổi. Chỉ những ô bạn THAY ĐỔI mới được gửi đi, kèm giá trị cũ để dễ đối chiếu.' }</div>`;
+  html += `<div class="rf-sec">Thông tin trong gia phả</div>`;
+  REQ_FIELDS.forEach((f,i)=>{
+    if(f.sec) html += `<div class="rf-sec">${escapeHtml(f.sec)}</div>`;
+    const val = raw ? String(get(raw,f.col)||'') : '';
+    const id='rf-f-'+i;
+    html += `<div class="rf-field" data-i="${i}"><label for="${id}">${escapeHtml(f.h)}${f.req?' *':''}${f.hint?(' <span style="opacity:.75">— '+escapeHtml(f.hint)+'</span>'):''}</label>`;
+    if(f.type==='select'){
+      html += `<select id="${id}">`+f.opts.map(o=>`<option value="${escapeHtml(o)}"${o===val?' selected':''}>${escapeHtml(o||'—')}</option>`).join('')+`</select>`;
+    } else if(f.type==='textarea'){
+      html += `<textarea id="${id}">${escapeHtml(val)}</textarea>`;
+    } else {
+      html += `<input id="${id}" type="text" value="${escapeHtml(val)}" autocomplete="off"/>`;
+    }
+    html += `</div>`;
+  });
+  html += `<div class="rf-sec">Người gửi yêu cầu</div>
+    <div class="rf-field"><label for="rf-sender">Tên của bạn *</label><input id="rf-sender" type="text" autocomplete="name"/></div>
+    <div class="rf-field"><label for="rf-contact">Liên hệ (SĐT/Zalo/email)</label><input id="rf-contact" type="text"/></div>
+    <div class="rf-field"><label for="rf-msg">Lời nhắn thêm</label><textarea id="rf-msg"></textarea></div>
+    <button class="rf-send" id="rf-send">Gửi yêu cầu</button>`;
+  body.innerHTML = html; body.scrollTop=0;
+
+  // đánh dấu ô đã thay đổi (chỉ ở chế độ sửa)
+  const orig = REQ_FIELDS.map(f=> raw ? String(get(raw,f.col)||'') : '');
+  if(mode==='sua'){
+    REQ_FIELDS.forEach((f,i)=>{
+      const el=document.getElementById('rf-f-'+i); if(!el) return;
+      el.addEventListener('input', ()=> el.closest('.rf-field').classList.toggle('changed', el.value.trim()!==orig[i].trim()));
+    });
+  }
+
+  $('#rf-send').onclick = ()=> submitRequest(mode, person, orig);
+  $('#reqform').classList.add('open');
+}
+
+/* Gửi yêu cầu: ưu tiên Web App (ghi vào tab YeuCau của Sheet); dự phòng email */
+async function submitRequest(mode, person, orig){
+  const name=$('#rf-sender').value.trim();
+  if(!name){ showBanner('Vui lòng điền <b>Tên của bạn</b> trước khi gửi.'); return; }
+  const nameF = REQ_FIELDS.findIndex(f=>f.req);
+  const vals = REQ_FIELDS.map((f,i)=>{ const el=document.getElementById('rf-f-'+i); return el?el.value.trim():''; });
+  if(mode==='them' && nameF>=0 && !vals[nameF]){ showBanner('Vui lòng điền <b>Họ tên</b> của người cần thêm.'); return; }
+
+  const changes=[];
+  REQ_FIELDS.forEach((f,i)=>{
+    if(mode==='them'){ if(vals[i]!=='') changes.push({truong:f.h, moi:vals[i]}); }
+    else { if(vals[i].trim()!==String(orig[i]||'').trim()) changes.push({truong:f.h, cu:String(orig[i]||''), moi:vals[i]}); }
+  });
+  if(mode==='sua' && !changes.length){ showBanner('Bạn chưa thay đổi thông tin nào.'); return; }
+
+  const payload={
+    loai: mode==='them'?'Thêm người':'Sửa thông tin',
+    id: person?person.id:(vals[0]||''),
+    ho_ten: person?person.data.ho_ten:(vals[1]||''),
+    nguoi_gui:name, lien_he:$('#rf-contact').value.trim(), loi_nhan:$('#rf-msg').value.trim(),
+    thay_doi:changes, thoi_gian:new Date().toISOString()
+  };
+
+  const btn=$('#rf-send'); btn.disabled=true; btn.textContent='Đang gửi…';
+  const done=()=>{ $('#reqform').classList.remove('open'); showBanner('Đã gửi yêu cầu. Cảm ơn bạn — người quản lý gia phả sẽ xem xét.'); };
+  try{
+    if(CONFIG.REQUEST_URL){
+      await fetch(CONFIG.REQUEST_URL, {method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(payload)});
+      done();
+    } else if(CONFIG.REQUEST_EMAIL){
+      const lines=changes.map(c=> c.cu!==undefined ? `• ${c.truong}: "${c.cu}" → "${c.moi}"` : `• ${c.truong}: ${c.moi}`);
+      const bodyTxt=`[${payload.loai}] ${payload.ho_ten}${payload.id?(' (ID '+payload.id+')'):''}\n\n${lines.join('\n')}\n\nNgười gửi: ${payload.nguoi_gui}${payload.lien_he?(' — '+payload.lien_he):''}\n${payload.loi_nhan?('Lời nhắn: '+payload.loi_nhan+'\n'):''}`;
+      location.href='mailto:'+CONFIG.REQUEST_EMAIL+'?subject='+encodeURIComponent('[Gia phả] Yêu cầu '+payload.loai+': '+payload.ho_ten)+'&body='+encodeURIComponent(bodyTxt);
+      done();
+    } else {
+      showBanner('Chức năng gửi yêu cầu <b>chưa được cấu hình</b> (REQUEST_URL / REQUEST_EMAIL). Vui lòng báo người quản lý.');
+    }
+  }catch(_){ showBanner('Không gửi được — kiểm tra kết nối mạng rồi thử lại.'); }
+  btn.disabled=false; btn.textContent='Gửi yêu cầu';
+}
 
 load();
 </script>
