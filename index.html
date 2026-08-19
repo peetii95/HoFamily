@@ -535,7 +535,7 @@
     <button class="more-btn" id="btn-backup">Tải bản lưu (.json)</button>
     <button class="more-btn" id="btn-reload">Tải lại dữ liệu (mới nhất)</button>
     <button class="more-btn" id="btn-about">Giới thiệu dòng họ</button>
-    <div class="more-note">Gia phả họ Hồ · bản v16</div>
+    <div class="more-note">Gia phả họ Hồ · bản v17</div>
   </div>
 </section>
 
@@ -686,7 +686,8 @@ const COL = {
   note_con:  ['con'],
   note_cha:  ['cha'],
   note_me:   ['me'],
-  note_bac:  ['cac_anh_chi_em_cua_cha_me']
+  note_anh_chi_em: ['anh_chi_em','cac_anh_chi_em','cac_anh_chi_em_cua_cha_me'],  // cột AB (tên mới "Anh chị em"; nhận cả tên cũ)
+  note_bac:  ['anh_chi_em_cua_cha_me']   // (không còn cột riêng — hàng "của Cha/Mẹ" nay chỉ tự suy)
 };
 
 /* ===========================================================================
@@ -920,6 +921,7 @@ function transform(rows){
         note_con: String(get(r,COL.note_con)||'').trim(),
         note_cha: String(get(r,COL.note_cha)||'').trim(),
         note_me:  String(get(r,COL.note_me)||'').trim(),
+        note_anh_chi_em: String(get(r,COL.note_anh_chi_em)||'').trim(),
         note_bac: String(get(r,COL.note_bac)||'').trim(),
         // ngày giỗ (ngày,tháng âm lịch): ưu tiên cột ÂL, nếu trống thì suy từ ngày mất dương lịch đầy đủ
         gio: (function(){
@@ -1230,11 +1232,23 @@ function openDetail(datum){
   });
   const bacByID = [...bacSet].map(nameOf).join('\n');
 
+  // Anh/chị/em (mặc định): người có CHUNG cha HOẶC chung mẹ (trừ chính mình)
+  const sibSet=new Set();
+  (rels.parents||[]).forEach(par=>{
+    const pp=DATA.find(d=>d.id===par); if(!pp) return;
+    (pp.rels.children||[]).forEach(c=>{ if(c!==datum.id) sibSet.add(c); });
+  });
+  const sibByID = [...sibSet]
+    .map(id=>DATA.find(d=>d.id===id)).filter(Boolean)
+    .sort((a,b)=> (a.data.gen_num-b.data.gen_num) || a.data.ho_ten.localeCompare(b.data.ho_ten,'vi'))
+    .map(p=>p.data.ho_ten).join('\n');
+
   if(rels.spouses && rels.spouses.length) add('Vợ/chồng', rels.spouses.map(nameOf).join('\n'));
   add('Cha', x.note_cha || chaByID);
   add('Mẹ',  x.note_me  || meByID);
+  add('Anh/chị/em', x.note_anh_chi_em || sibByID);
   add('Con', x.note_con || conByID);
-  add('Anh chị em của Cha/Mẹ', x.note_bac || bacByID);
+  add('Anh chị em của Cha/Mẹ', bacByID);
 
   add('Ghi chú', x.ghi_chu);
   if(!rowsInfo.length) rowsInfo.push(['Thông tin','Chưa có ghi chép thêm.']);
@@ -1760,10 +1774,10 @@ const REQ_FIELDS = [
   {h:'Người phụng tế',              col:COL.nguoi_phung_te},
   {h:'Mãn phần (nơi mất)',          col:COL.man_phan,    type:'textarea'},
   {h:'Ghi chú',                     col:COL.note,        type:'textarea'},
-  {h:'Con',                         col:COL.note_con,    type:'textarea', sec:'Ghi chú quan hệ'},
+  {h:'Con',                         col:COL.note_con,    type:'textarea', sec:'Ghi chú quan hệ (không bắt buộc — để trống thì app tự suy từ ID)'},
   {h:'Cha',                         col:COL.note_cha},
   {h:'Mẹ',                          col:COL.note_me},
-  {h:'Các anh chị em của Cha/mẹ',   col:COL.note_bac,    type:'textarea', hint:'Cô dì chú bác của người được thêm/sửa'},
+  {h:'Anh chị em',                  col:COL.note_anh_chi_em, type:'textarea', hint:'Để trống thì app tự tìm người cùng cha hoặc cùng mẹ'},
 ];
 
 function openEditMenu(){ $('#edit-back').classList.add('open'); $('#editmenu').classList.add('open'); }
