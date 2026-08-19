@@ -1821,10 +1821,10 @@ const REQ_FIELDS = [
   {h:'Người phụng tế',              col:COL.nguoi_phung_te},
   {h:'Mãn phần (nơi mất)',          col:COL.man_phan,    type:'textarea'},
   {h:'Ghi chú',                     col:COL.note,        type:'textarea'},
-  {h:'Con',                         col:COL.note_con,    type:'textarea', sec:'Ghi chú quan hệ (không bắt buộc — để trống thì app tự suy từ ID)'},
+  {h:'Con',                         col:COL.note_con,    type:'textarea', sec:'Ghi chú quan hệ'},
   {h:'Cha',                         col:COL.note_cha},
   {h:'Mẹ',                          col:COL.note_me},
-  {h:'Anh chị em',                  col:COL.note_anh_chi_em, type:'textarea', hint:'Để trống thì app tự tìm người cùng cha hoặc cùng mẹ'},
+  {h:'Anh chị em',                  col:COL.note_anh_chi_em, type:'textarea'},
 ];
 
 function openEditMenu(){ $('#edit-back').classList.add('open'); $('#editmenu').classList.add('open'); }
