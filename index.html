@@ -493,6 +493,15 @@
     font:inherit; font-size:14px; font-weight:600; color:var(--cinnabar);
     background:#FBF2F0; border:1px dashed #d9a79f; border-radius:12px; cursor:pointer }
   .d-suggest:active{ border-style:solid }
+  /* tên người thân bấm được trong phiếu */
+  .d-row .v .rel-link{ display:inline-block; margin:0 6px 5px 0; padding:5px 11px; font:inherit; font-size:14px;
+    color:var(--cinnabar); background:#FBF2F0; border:1px solid #e6c3bd; border-radius:999px; cursor:pointer; line-height:1.2 }
+  .d-row .v .rel-link:active{ background:#f0dcd7 }
+  .d-btns{ display:flex; gap:8px; margin-top:16px }
+  .d-btns .d-share, .d-btns .d-suggest{ flex:1 1 0; width:auto; margin:0; text-align:center }
+  .d-share{ padding:12px; font:inherit; font-size:14px; font-weight:600; color:var(--ink);
+    background:var(--card); border:1px solid var(--line); border-radius:12px; cursor:pointer }
+  .d-share:active{ border-color:var(--gold) }
 </style>
 </head>
 <body>
@@ -535,7 +544,7 @@
     <button class="more-btn" id="btn-backup">Tải bản lưu (.json)</button>
     <button class="more-btn" id="btn-reload">Tải lại dữ liệu (mới nhất)</button>
     <button class="more-btn" id="btn-about">Giới thiệu dòng họ</button>
-    <div class="more-note">Gia phả họ Hồ · bản v17</div>
+    <div class="more-note">Gia phả họ Hồ · bản v19</div>
   </div>
 </section>
 
@@ -1203,7 +1212,12 @@ function openDetail(datum){
   const rels = datum.rels||{};
   const nameOf = id => { const p=DATA.find(d=>d.id===id); return p?p.data.ho_ten:'(?)'; };
   const rowsInfo = [];
-  const add=(k,v)=>{ if(v && String(v).trim()) rowsInfo.push([k, v]); };
+  const add=(k,v)=>{ if(v && String(v).trim()) rowsInfo.push({k, text:String(v)}); };
+  const toPeople = ids => (ids||[]).map(id=>{ const p=DATA.find(d=>d.id===id); return p?{id:p.id, name:p.data.ho_ten}:null; }).filter(Boolean);
+  const addPeople=(k, ids, override)=>{
+    if(override && String(override).trim()) rowsInfo.push({k, text:String(override).trim()});
+    else { const ppl=toPeople(ids); if(ppl.length) rowsInfo.push({k, people:ppl}); }
+  };
 
   if(x.gio){
     add('Ngày giỗ (ÂL)', `mùng ${x.gio.day} tháng ${tenThangAL(x.gio.month)}`);
@@ -1219,43 +1233,50 @@ function openDetail(datum){
   add('Người phụng tế',         x.nguoi_phung_te);
   add('Mãn phần (nơi mất)',     x.man_phan);
 
-  // Quan hệ: dựa theo ID là gốc, nhưng 4 cột ghi chú sẽ GHI ĐÈ nếu không trống
+  // Quan hệ: dựa theo ID là gốc, cột ghi chú GHI ĐÈ nếu không trống
   const parents = (rels.parents||[]).map(id=>DATA.find(d=>d.id===id)).filter(Boolean);
-  const chaByID = parents.filter(p=>p.data.gender!=='F').map(p=>p.data.ho_ten).join('\n');
-  const meByID  = parents.filter(p=>p.data.gender==='F').map(p=>p.data.ho_ten).join('\n');
-  const conByID = (rels.children||[]).map(nameOf).join('\n');
+  const chaIds = parents.filter(p=>p.data.gender!=='F').map(p=>p.id);
+  const meIds  = parents.filter(p=>p.data.gender==='F').map(p=>p.id);
+  const conIds = (rels.children||[]).slice();
   // bác/chú/cô/cậu/dì = anh chị em của cha & mẹ (suy từ ID)
   const bacSet=new Set();
   (rels.parents||[]).forEach(par=>{
     const pp=DATA.find(d=>d.id===par); if(!pp) return;
     (pp.rels.parents||[]).forEach(gp=>{ const g=DATA.find(d=>d.id===gp); if(g)(g.rels.children||[]).forEach(c=>{ if(c!==par) bacSet.add(c); }); });
   });
-  const bacByID = [...bacSet].map(nameOf).join('\n');
-
-  // Anh/chị/em (mặc định): người có CHUNG cha HOẶC chung mẹ (trừ chính mình)
+  const bacIds = [...bacSet];
+  // Anh/chị/em (mặc định): người CHUNG cha HOẶC chung mẹ (trừ chính mình)
   const sibSet=new Set();
   (rels.parents||[]).forEach(par=>{
     const pp=DATA.find(d=>d.id===par); if(!pp) return;
     (pp.rels.children||[]).forEach(c=>{ if(c!==datum.id) sibSet.add(c); });
   });
-  const sibByID = [...sibSet]
-    .map(id=>DATA.find(d=>d.id===id)).filter(Boolean)
+  const sibIds = [...sibSet].map(id=>DATA.find(d=>d.id===id)).filter(Boolean)
     .sort((a,b)=> (a.data.gen_num-b.data.gen_num) || a.data.ho_ten.localeCompare(b.data.ho_ten,'vi'))
-    .map(p=>p.data.ho_ten).join('\n');
+    .map(p=>p.id);
 
-  if(rels.spouses && rels.spouses.length) add('Vợ/chồng', rels.spouses.map(nameOf).join('\n'));
-  add('Cha', x.note_cha || chaByID);
-  add('Mẹ',  x.note_me  || meByID);
-  add('Anh/chị/em', x.note_anh_chi_em || sibByID);
-  add('Con', x.note_con || conByID);
-  add('Anh chị em của Cha/Mẹ', bacByID);
+  addPeople('Vợ/chồng', rels.spouses||[], null);
+  addPeople('Cha', chaIds, x.note_cha);
+  addPeople('Mẹ',  meIds,  x.note_me);
+  addPeople('Anh/chị/em', sibIds, x.note_anh_chi_em);
+  addPeople('Con', conIds, x.note_con);
+  addPeople('Anh chị em của Cha/Mẹ', bacIds, null);
 
   add('Ghi chú', x.ghi_chu);
-  if(!rowsInfo.length) rowsInfo.push(['Thông tin','Chưa có ghi chép thêm.']);
-  body.innerHTML = rowsInfo.map(([k,v])=>`<div class="d-row"><div class="k">${k}</div><div class="v">${escapeHtml(v)}</div></div>`).join('')
-    + `<button class="d-suggest" id="d-suggest">✎ Đề nghị chỉnh sửa thông tin</button>`;
+  if(!rowsInfo.length) rowsInfo.push({k:'Thông tin', text:'Chưa có ghi chép thêm.'});
+  body.innerHTML = rowsInfo.map(row=>{
+    const val = row.people
+      ? row.people.map(p=>`<button class="rel-link" data-id="${escapeHtml(p.id)}">${escapeHtml(p.name)}</button>`).join('')
+      : escapeHtml(row.text);
+    return `<div class="d-row"><div class="k">${row.k}</div><div class="v">${val}</div></div>`;
+  }).join('')
+    + `<div class="d-btns"><button class="d-share" id="d-share">🔗 Chia sẻ</button><button class="d-suggest" id="d-suggest">✎ Đề nghị chỉnh sửa</button></div>`;
+
+  // chạm tên người thân → nhảy tới phiếu của họ
+  body.querySelectorAll('.rel-link').forEach(b=> b.onclick=()=>{ const p=DATA.find(x=>x.id===b.getAttribute('data-id')); if(p) openDetail(p); });
 
   $('#d-suggest').onclick = ()=>{ closeDetail(); openReqForm('sua', datum); };
+  $('#d-share').onclick = ()=> sharePerson(datum);
 
   $('#d-focus').onclick = ()=>{ const id=datum.id; closeDetail(); showTab('tree', true);
     setTimeout(()=>{ if(CHART){ CHART.updateMainId(id); CHART.updateTree({tree_position:'main_to_middle'}); } }, 80); };
@@ -1263,6 +1284,31 @@ function openDetail(datum){
   const panel=$('#detail'); panel.classList.add('open'); panel.setAttribute('aria-hidden','false');
 }
 function closeDetail(){ const p=$('#detail'); p.classList.remove('open'); p.setAttribute('aria-hidden','true'); }
+
+/* Chia sẻ link tới một người: ...?id=<ID>. Dùng Web Share nếu có, không thì chép vào clipboard. */
+async function sharePerson(datum){
+  const url = location.origin + location.pathname + '?id=' + encodeURIComponent(datum.id);
+  const ten = datum.data.ho_ten || 'người này';
+  const title = (CONFIG.FAMILY_NAME||'Gia phả') + ' — ' + ten;
+  try{
+    if(navigator.share){ await navigator.share({ title, text:'Xem '+ten+' trong '+(CONFIG.FAMILY_NAME||'gia phả'), url }); return; }
+  }catch(_){ return; }   // người dùng bấm huỷ hộp chia sẻ
+  try{
+    await navigator.clipboard.writeText(url);
+    showBanner('Đã sao chép link tới <b>'+escapeHtml(ten)+'</b> — dán vào Zalo/tin nhắn để gửi.');
+  }catch(_){
+    showBanner('Link tới '+escapeHtml(ten)+':<br><span style="word-break:break-all">'+escapeHtml(url)+'</span>');
+  }
+}
+/* Mở app kèm ?id=… → mở thẳng phiếu người đó */
+function openFromUrl(){
+  try{
+    const pid=new URLSearchParams(location.search).get('id');
+    if(!pid) return;
+    const p=DATA.find(d=>d.id===normId(pid)) || DATA.find(d=>d.id===pid);
+    if(p) setTimeout(()=> openDetail(p), 150);
+  }catch(_){ }
+}
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 /* ===========================================================================
@@ -1304,6 +1350,7 @@ async function load(){
   buildHome();
   buildPeople();
   showTab('home');
+  openFromUrl();
   if(fromSheet) setTimeout(hideBanner, 4000);
 }
 
