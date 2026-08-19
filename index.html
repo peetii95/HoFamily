@@ -312,8 +312,10 @@
     border-radius:14px; box-shadow:0 24px 70px rgba(42,38,32,.32); opacity:0; transition:.18s; }
   #rel.open{ display:flex; opacity:1; transform:translate(-50%,-50%) scale(1) }
   .rel-pickers{ display:flex; gap:8px; align-items:center; margin:10px 0 6px }
-  .rel-pickers select{ flex:1 1 0; min-width:0; font:inherit; font-size:14px; padding:9px 10px;
-    border:1px solid var(--line); border-radius:9px; background:#fff }
+  .rel-pickers select, .rel-pickbtn{ flex:1 1 0; min-width:0; font:inherit; font-size:14px; padding:9px 10px;
+    border:1px solid var(--line); border-radius:9px; background:#fff; text-align:left; color:var(--ink); cursor:pointer;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+  .rel-pickbtn .ph{ color:var(--ink-soft) }
   .rel-swap{ flex:0 0 auto; width:38px; height:38px; border:1px solid var(--line); background:#fff;
     border-radius:9px; cursor:pointer; font-size:16px; color:var(--ink-soft) }
   .rel-swap:hover{ border-color:var(--gold) }
@@ -474,7 +476,23 @@
   .rf-send{ width:100%; border:0; border-radius:12px; background:var(--cinnabar); color:#F6E6C8;
     font:inherit; font-size:16px; font-weight:700; padding:14px; cursor:pointer; margin-top:8px }
   .rf-send:disabled{ opacity:.55 }
+  .rf-photo{ margin:-4px 0 14px }
+  .rf-photo-btn{ width:100%; font:inherit; font-size:14px; font-weight:600; color:var(--ink);
+    background:var(--card); border:1px dashed var(--gold); border-radius:10px; padding:11px 12px; cursor:pointer }
+  .rf-photo-btn:disabled{ opacity:.6 }
+  .rf-photo-prev{ display:flex; gap:10px; align-items:center; margin-top:8px;
+    background:var(--card); border:1px solid var(--line); border-radius:10px; padding:8px }
+  .rf-photo-prev img{ width:56px; height:56px; object-fit:cover; border-radius:8px; flex:0 0 auto }
+  .rf-photo-meta{ min-width:0; font-size:12.5px; color:var(--ink-soft) }
+  .rf-photo-meta span{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:56vw }
+  .rf-photo-del{ margin-top:4px; border:0; background:none; color:var(--cinnabar); font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; padding:0 }
   .rf-pick .person-row{ border-radius:12px; border:1px solid var(--line); margin-bottom:8px; background:var(--card) }
+
+  /* nút "Đề nghị chỉnh sửa" ở cuối phiếu cá nhân */
+  .d-suggest{ display:block; width:100%; margin:16px 0 6px; padding:12px;
+    font:inherit; font-size:14px; font-weight:600; color:var(--cinnabar);
+    background:#FBF2F0; border:1px dashed #d9a79f; border-radius:12px; cursor:pointer }
+  .d-suggest:active{ border-style:solid }
 </style>
 </head>
 <body>
@@ -517,7 +535,7 @@
     <button class="more-btn" id="btn-backup">Tải bản lưu (.json)</button>
     <button class="more-btn" id="btn-reload">Tải lại dữ liệu (mới nhất)</button>
     <button class="more-btn" id="btn-about">Giới thiệu dòng họ</button>
-    <div class="more-note">Gia phả họ Hồ · bản v14</div>
+    <div class="more-note">Gia phả họ Hồ · bản v16</div>
   </div>
 </section>
 
@@ -586,9 +604,9 @@
   </div>
   <div class="chk-body">
     <div class="rel-pickers">
-      <select id="rel-a"></select>
+      <button class="rel-pickbtn" id="rel-a-btn" type="button"></button>
       <button class="rel-swap" id="rel-swap" title="Đổi chỗ">⇄</button>
-      <select id="rel-b"></select>
+      <button class="rel-pickbtn" id="rel-b-btn" type="button"></button>
     </div>
     <div id="rel-result"></div>
   </div>
@@ -657,7 +675,8 @@ const COL = {
   photo:     ['anh'],
   ten_tu:    ['ten_tu'],
   phap_danh: ['phap_danh'],
-  nguyen_quan:['nguyen_quan_noi_sinh'],
+  nguyen_quan:['nguyen_quan_noi_sinh','nguyen_quan'],
+  noi_sinh:  ['noi_sinh'],
   dinh_cu:   ['dinh_cu'],
   nghe_nghiep:['nghe_nghiep_cong_danh'],
   nguoi_phung_te:['nguoi_phung_te'],
@@ -891,6 +910,7 @@ function transform(rows){
         ten_tu:        String(get(r,COL.ten_tu)||'').trim(),
         phap_danh:     String(get(r,COL.phap_danh)||'').trim(),
         nguyen_quan:   String(get(r,COL.nguyen_quan)||'').trim(),
+        noi_sinh:      String(get(r,COL.noi_sinh)||'').trim(),
         dinh_cu:       String(get(r,COL.dinh_cu)||'').trim(),
         nghe_nghiep:   String(get(r,COL.nghe_nghiep)||'').trim(),
         nguoi_phung_te:String(get(r,COL.nguoi_phung_te)||'').trim(),
@@ -1190,7 +1210,8 @@ function openDetail(datum){
   }
   add('Tên tự',                 x.tu);
   add('Pháp danh',              x.phap_danh);
-  add('Nguyên quán (nơi sinh)', x.nguyen_quan);
+  add('Nguyên quán',            x.nguyen_quan);
+  add('Nơi sinh',               x.noi_sinh);
   add('Định cư',                x.dinh_cu);
   add('Nghề nghiệp / Công danh',x.nghe_nghiep);
   add('Người phụng tế',         x.nguoi_phung_te);
@@ -1217,7 +1238,10 @@ function openDetail(datum){
 
   add('Ghi chú', x.ghi_chu);
   if(!rowsInfo.length) rowsInfo.push(['Thông tin','Chưa có ghi chép thêm.']);
-  body.innerHTML = rowsInfo.map(([k,v])=>`<div class="d-row"><div class="k">${k}</div><div class="v">${escapeHtml(v)}</div></div>`).join('');
+  body.innerHTML = rowsInfo.map(([k,v])=>`<div class="d-row"><div class="k">${k}</div><div class="v">${escapeHtml(v)}</div></div>`).join('')
+    + `<button class="d-suggest" id="d-suggest">✎ Đề nghị chỉnh sửa thông tin</button>`;
+
+  $('#d-suggest').onclick = ()=>{ closeDetail(); openReqForm('sua', datum); };
 
   $('#d-focus').onclick = ()=>{ const id=datum.id; closeDetail(); showTab('tree', true);
     setTimeout(()=>{ if(CHART){ CHART.updateMainId(id); CHART.updateTree({tree_position:'main_to_middle'}); } }, 80); };
@@ -1466,15 +1490,23 @@ function relationship(aId,bId){
   return {sym:'không có quan hệ huyết thống trực tiếp trong gia phả (có thể là thông gia).'};
 }
 
+let REL_A='', REL_B='';
+function relBtnLabel(btn, id, ph){
+  const p=DATA.find(d=>d.id===id);
+  btn.innerHTML = p ? escapeHtml(p.data.ho_ten)+(p.data.doi?(' <span class="ph">· Đời '+escapeHtml(p.data.doi)+'</span>'):'')
+                    : '<span class="ph">'+ph+'</span>';
+}
+function refreshRelBtns(){
+  relBtnLabel($('#rel-a-btn'), REL_A, 'Chạm để chọn người thứ nhất…');
+  relBtnLabel($('#rel-b-btn'), REL_B, 'Chạm để chọn người thứ hai…');
+}
 function populateRelSelects(){
-  const opts = [...DATA].sort((a,b)=>(a.data.gen_num-b.data.gen_num)|| a.data.ho_ten.localeCompare(b.data.ho_ten))
-    .map(d=>`<option value="${escapeHtml(d.id)}">${escapeHtml(d.data.ho_ten)}${d.data.years?' · '+escapeHtml(d.data.years):''}</option>`).join('');
-  const a=$('#rel-a'), b=$('#rel-b'); a.innerHTML=opts; b.innerHTML=opts;
-  a.value = ROOT_ID || (DATA[0]&&DATA[0].id);
-  b.value = (DATA.find(d=>d.id!==a.value)||DATA[0]).id;
+  if(!REL_A || !DATA.some(d=>d.id===REL_A)) REL_A = ROOT_ID || (DATA[0]&&DATA[0].id) || '';
+  if(!REL_B || !DATA.some(d=>d.id===REL_B) || REL_B===REL_A) REL_B = (DATA.find(d=>d.id!==REL_A)||DATA[0]||{}).id || '';
+  refreshRelBtns();
 }
 function renderRel(){
-  const a=$('#rel-a').value, b=$('#rel-b').value, res=$('#rel-result');
+  const a=REL_A, b=REL_B, res=$('#rel-result');
   if(!a||!b){ res.innerHTML=''; return; }
   const r=relationship(a,b), nA=personName(a), nB=personName(b);
   let html='';
@@ -1495,9 +1527,9 @@ function closeRel(){ $('#rel-back').classList.remove('open'); $('#rel').classLis
 $('#btn-rel').onclick = openRel;
 $('#rel-close').onclick = closeRel;
 $('#rel-back').onclick = closeRel;
-$('#rel-a').onchange = renderRel;
-$('#rel-b').onchange = renderRel;
-$('#rel-swap').onclick = ()=>{ const a=$('#rel-a').value; $('#rel-a').value=$('#rel-b').value; $('#rel-b').value=a; renderRel(); };
+$('#rel-a-btn').onclick = ()=> openSearch(p=>{ REL_A=p.id; refreshRelBtns(); renderRel(); });
+$('#rel-b-btn').onclick = ()=> openSearch(p=>{ REL_B=p.id; refreshRelBtns(); renderRel(); });
+$('#rel-swap').onclick = ()=>{ const t=REL_A; REL_A=REL_B; REL_B=t; refreshRelBtns(); renderRel(); };
 
 /* ===========================================================================
    9) LỌC THEO CHI / NHÁNH — chỉ hiện một người gốc chi và con cháu
@@ -1636,12 +1668,17 @@ function renderSearch(q){
       <div class="p-av ${gcl}"${av}>${d.data.anh?'':escapeHtml(initial)}</div>
       <div class="p-main"><div class="p-name">${escapeHtml(d.data.ho_ten)}</div><div class="p-meta">${escapeHtml(meta)}</div></div></div>`;
   }).join('');
-  box.querySelectorAll('.person-row').forEach(r=> r.onclick=()=>{ const p=DATA.find(x=>x.id===r.getAttribute('data-id')); if(p){ closeSearch(); openDetail(p); } });
+  box.querySelectorAll('.person-row').forEach(r=> r.onclick=()=>{ const p=DATA.find(x=>x.id===r.getAttribute('data-id')); if(!p) return;
+    if(SEARCH_PICK){ const cb=SEARCH_PICK; SEARCH_PICK=null; closeSearch(); cb(p); }
+    else { closeSearch(); openDetail(p); } });
 }
-function openSearch(){ $('#search-back').classList.add('open'); $('#search').classList.add('open');
-  const i=$('#search-input'); i.value=''; renderSearch(''); setTimeout(()=>i.focus(),50); }
+let SEARCH_PICK=null;   // callback khi đang ở chế độ "chọn người" (vd cho Tra quan hệ)
+function openSearch(pickCb){ SEARCH_PICK=(typeof pickCb==='function')?pickCb:null;
+  $('#search-back').classList.add('open'); $('#search').classList.add('open');
+  const i=$('#search-input'); i.value=''; i.placeholder=SEARCH_PICK?'Chọn người: gõ tên, tên tự, pháp danh…':'Tìm theo tên, tên tự, pháp danh…';
+  renderSearch(''); setTimeout(()=>i.focus(),50); }
 function closeSearch(){ $('#search-back').classList.remove('open'); $('#search').classList.remove('open'); }
-$('#search-open').onclick = openSearch;
+$('#search-open').onclick = ()=> openSearch();
 $('#search-close').onclick = closeSearch;
 $('#search-back').onclick = closeSearch;
 $('#search-input').addEventListener('input', e=> renderSearch(e.target.value));
@@ -1716,7 +1753,8 @@ const REQ_FIELDS = [
   {h:'Ảnh',                         col:COL.photo,       hint:'dán link ảnh Google Drive (đã chia sẻ công khai)'},
   {h:'Tên tự',                      col:COL.ten_tu},
   {h:'Pháp danh',                   col:COL.phap_danh},
-  {h:'Nguyên quán (nơi sinh)',      col:COL.nguyen_quan, type:'textarea'},
+  {h:'Nguyên quán',                 col:COL.nguyen_quan, type:'textarea'},
+  {h:'Nơi sinh',                    col:COL.noi_sinh,    type:'textarea'},
   {h:'Định cư',                     col:COL.dinh_cu,     type:'textarea'},
   {h:'Nghề nghiệp/Công danh',       col:COL.nghe_nghiep, type:'textarea'},
   {h:'Người phụng tế',              col:COL.nguoi_phung_te},
@@ -1786,6 +1824,18 @@ function openReqForm(mode, person){
       html += `<input id="${id}" type="text" value="${escapeHtml(val)}" autocomplete="off"/>`;
     }
     html += `</div>`;
+    // ngay dưới ô link "Ảnh": cho phép TẢI ẢNH TRỰC TIẾP từ máy
+    if(f.col===COL.photo){
+      html += `<div class="rf-photo">
+        <input type="file" id="rf-photo" accept="image/*" hidden />
+        <button type="button" class="rf-photo-btn" id="rf-photo-btn">📷 Hoặc chọn ảnh từ máy (không cần link)</button>
+        <div class="rf-photo-prev" id="rf-photo-prev" hidden>
+          <img id="rf-photo-img" alt="Ảnh đã chọn"/>
+          <div class="rf-photo-meta"><span id="rf-photo-name"></span>
+          <button type="button" class="rf-photo-del" id="rf-photo-del">Bỏ ảnh</button></div>
+        </div>
+      </div>`;
+    }
   });
   html += `<div class="rf-sec">Người gửi yêu cầu</div>
     <div class="rf-field"><label for="rf-sender">Tên của bạn *</label><input id="rf-sender" type="text" autocomplete="name"/></div>
@@ -1804,7 +1854,52 @@ function openReqForm(mode, person){
   }
 
   $('#rf-send').onclick = ()=> submitRequest(mode, person, orig);
+
+  // ---- chọn & nén ảnh (nếu người dùng tải ảnh trực tiếp) ----
+  REQ_PHOTO = null;
+  const phIn=$('#rf-photo'), phBtn=$('#rf-photo-btn'), phPrev=$('#rf-photo-prev');
+  if(phBtn){
+    phBtn.onclick = ()=> phIn.click();
+    phIn.onchange = async ()=>{
+      const file=phIn.files && phIn.files[0]; if(!file) return;
+      phBtn.disabled=true; phBtn.textContent='Đang xử lý ảnh…';
+      try{
+        const b64 = await compressImage(file, 1000, 0.82);
+        REQ_PHOTO = { b64, name:(file.name||'anh.jpg') };
+        $('#rf-photo-img').src = 'data:image/jpeg;base64,'+b64;
+        $('#rf-photo-name').textContent = file.name || 'ảnh đã chọn';
+        phPrev.hidden=false;
+        phBtn.textContent='📷 Chọn ảnh khác';
+      }catch(_){ REQ_PHOTO=null; showBanner('Không đọc được ảnh này — thử ảnh khác (JPG/PNG).'); phBtn.textContent='📷 Hoặc chọn ảnh từ máy (không cần link)'; }
+      phBtn.disabled=false;
+    };
+    $('#rf-photo-del').onclick = ()=>{ REQ_PHOTO=null; phIn.value=''; phPrev.hidden=true; phBtn.textContent='📷 Hoặc chọn ảnh từ máy (không cần link)'; };
+  }
+
   $('#reqform').classList.add('open');
+}
+
+/* Nén ảnh phía người gửi: thu về tối đa maxDim px, xuất JPEG base64 (không kèm tiền tố data:) */
+let REQ_PHOTO = null;
+function compressImage(file, maxDim, quality){
+  return new Promise((resolve,reject)=>{
+    const fr=new FileReader();
+    fr.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        try{
+          let w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+          const sc=Math.min(1, maxDim/Math.max(w,h)); w=Math.max(1,Math.round(w*sc)); h=Math.max(1,Math.round(h*sc));
+          const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+          cv.getContext('2d').drawImage(img,0,0,w,h);
+          const url=cv.toDataURL('image/jpeg', quality||0.82);
+          resolve(url.split(',')[1]);
+        }catch(e){ reject(e); }
+      };
+      img.onerror=reject; img.src=fr.result;
+    };
+    fr.onerror=reject; fr.readAsDataURL(file);
+  });
 }
 
 /* Gửi yêu cầu: ưu tiên Web App (ghi vào tab YeuCau của Sheet); dự phòng email */
@@ -1820,7 +1915,7 @@ async function submitRequest(mode, person, orig){
     if(mode==='them'){ if(vals[i]!=='') changes.push({truong:f.h, moi:vals[i]}); }
     else { if(vals[i].trim()!==String(orig[i]||'').trim()) changes.push({truong:f.h, cu:String(orig[i]||''), moi:vals[i]}); }
   });
-  if(mode==='sua' && !changes.length){ showBanner('Bạn chưa thay đổi thông tin nào.'); return; }
+  if(mode==='sua' && !changes.length && !REQ_PHOTO){ showBanner('Bạn chưa thay đổi thông tin nào.'); return; }
 
   const payload={
     loai: mode==='them'?'Thêm người':'Sửa thông tin',
@@ -1829,6 +1924,8 @@ async function submitRequest(mode, person, orig){
     nguoi_gui:name, lien_he:$('#rf-contact').value.trim(), loi_nhan:$('#rf-msg').value.trim(),
     thay_doi:changes, thoi_gian:new Date().toISOString()
   };
+  if(REQ_PHOTO){ payload.anh_base64=REQ_PHOTO.b64; payload.anh_ten=REQ_PHOTO.name;
+    payload.thay_doi.push({truong:'Ảnh (tải trực tiếp)', moi:'(ảnh đính kèm — xem cột "Ảnh đính kèm")'}); }
 
   const btn=$('#rf-send'); btn.disabled=true; btn.textContent='Đang gửi…';
   const done=()=>{ $('#reqform').classList.remove('open'); showBanner('Đã gửi yêu cầu. Cảm ơn bạn — người quản lý gia phả sẽ xem xét.'); };
