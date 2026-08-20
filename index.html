@@ -544,7 +544,7 @@
     <button class="more-btn" id="btn-backup">Tải bản lưu (.json)</button>
     <button class="more-btn" id="btn-reload">Tải lại dữ liệu (mới nhất)</button>
     <button class="more-btn" id="btn-about">Giới thiệu dòng họ</button>
-    <div class="more-note">Gia phả họ Hồ · bản v19</div>
+    <div class="more-note">Gia phả họ Hồ · bản v20</div>
   </div>
 </section>
 
@@ -1821,10 +1821,10 @@ const REQ_FIELDS = [
   {h:'Người phụng tế',              col:COL.nguoi_phung_te},
   {h:'Mãn phần (nơi mất)',          col:COL.man_phan,    type:'textarea'},
   {h:'Ghi chú',                     col:COL.note,        type:'textarea'},
-  {h:'Con',                         col:COL.note_con,    type:'textarea', sec:'Ghi chú quan hệ'},
+  {h:'Con',                         col:COL.note_con,    type:'textarea', sec:'Ghi chú quan hệ (không bắt buộc — để trống thì app tự suy từ ID)'},
   {h:'Cha',                         col:COL.note_cha},
   {h:'Mẹ',                          col:COL.note_me},
-  {h:'Anh chị em',                  col:COL.note_anh_chi_em, type:'textarea'},
+  {h:'Anh chị em',                  col:COL.note_anh_chi_em, type:'textarea', hint:'Để trống thì app tự tìm người cùng cha hoặc cùng mẹ'},
 ];
 
 function openEditMenu(){ $('#edit-back').classList.add('open'); $('#editmenu').classList.add('open'); }
@@ -1985,6 +1985,14 @@ async function submitRequest(mode, person, orig){
     nguoi_gui:name, lien_he:$('#rf-contact').value.trim(), loi_nhan:$('#rf-msg').value.trim(),
     thay_doi:changes, thoi_gian:new Date().toISOString()
   };
+
+  // fields: giá trị theo TỪNG CỘT (dùng đúng tên cột thật trong Sheet GiaPha) để tab YeuCau trải đều ra cột
+  const hdrs = (RAW_ROWS && RAW_ROWS[0]) ? Object.keys(RAW_ROWS[0]) : [];
+  const headerFor = (aliases)=>{ for(const k of hdrs){ if(aliases.includes(normKey(k))) return k; } return null; };
+  const fields = {};
+  REQ_FIELDS.forEach((f,i)=>{ if(vals[i]!=='' ){ const h = headerFor(f.col) || f.h; fields[h] = vals[i]; } });
+  payload.fields = fields;
+
   if(REQ_PHOTO){ payload.anh_base64=REQ_PHOTO.b64; payload.anh_ten=REQ_PHOTO.name;
     payload.thay_doi.push({truong:'Ảnh (tải trực tiếp)', moi:'(ảnh đính kèm — xem cột "Ảnh đính kèm")'}); }
 
