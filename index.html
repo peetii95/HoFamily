@@ -205,6 +205,8 @@
     display:grid; place-items:center; font-family:'Noto Serif',serif; font-size:34px; color:#b6a888;
   }
   .d-name{ font-family:'Noto Serif',serif; font-weight:700; font-size:23px; margin:0; line-height:1.15 }
+  .d-tu{ color:var(--cinnabar); font-style:italic; font-size:14px; margin-top:3px }
+  .d-tu:empty{ display:none }
   .d-sub{ color:var(--ink-soft); font-size:14px; margin-top:6px }
   .d-chip{ display:inline-block; font-size:12px; padding:3px 10px; border-radius:999px; margin-top:10px;
            border:1px solid var(--line); background:#fff }
@@ -627,6 +629,7 @@
     <div class="gen" id="d-gen">Đời —</div>
     <div class="d-photo" id="d-photo"></div>
     <h2 class="d-name" id="d-name">—</h2>
+    <div class="d-tu" id="d-tu"></div>
     <div class="d-sub" id="d-years"></div>
     <span class="d-chip" id="d-gender"></span>
   </div>
@@ -1200,6 +1203,7 @@ function openDetail(datum){
   const x = datum.data;
   $('#d-gen').textContent = x.doi ? ('Đời '+x.doi) : 'Đời —';
   $('#d-name').textContent = x.ho_ten;
+  $('#d-tu').textContent = x.tu ? (x.tu) : '';
   $('#d-years').textContent = x.years || '';
   const g=$('#d-gender'); g.textContent = datum.data.gender==='F'?'Nữ':'Nam';
   g.className='d-chip '+(datum.data.gender==='F'?'f':'m');
