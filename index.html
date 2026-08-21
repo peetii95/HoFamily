@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<title>Gia phả họ Hồ — Cây gia phả trực tuyến</title>
+<title>Gia phả họ — Cây gia phả trực tuyến</title>
 <meta name="description" content="Cây gia phả trực tuyến họ Hồ — xem quan hệ, ngày giỗ (âm lịch), tên tự và tra cứu dòng họ." />
 
 <!-- PWA: cài ra màn hình chính & chạy offline -->
@@ -205,8 +205,6 @@
     display:grid; place-items:center; font-family:'Noto Serif',serif; font-size:34px; color:#b6a888;
   }
   .d-name{ font-family:'Noto Serif',serif; font-weight:700; font-size:23px; margin:0; line-height:1.15 }
-  .d-tu{ color:var(--cinnabar); font-style:italic; font-size:14px; margin-top:3px }
-  .d-tu:empty{ display:none }
   .d-sub{ color:var(--ink-soft); font-size:14px; margin-top:6px }
   .d-chip{ display:inline-block; font-size:12px; padding:3px 10px; border-radius:999px; margin-top:10px;
            border:1px solid var(--line); background:#fff }
@@ -546,7 +544,7 @@
     <button class="more-btn" id="btn-backup">Tải bản lưu (.json)</button>
     <button class="more-btn" id="btn-reload">Tải lại dữ liệu (mới nhất)</button>
     <button class="more-btn" id="btn-about">Giới thiệu dòng họ</button>
-    <div class="more-note">Gia phả họ Hồ · bản v20</div>
+    <div class="more-note">Gia phả họ Hồ · bản v21</div>
   </div>
 </section>
 
@@ -629,7 +627,6 @@
     <div class="gen" id="d-gen">Đời —</div>
     <div class="d-photo" id="d-photo"></div>
     <h2 class="d-name" id="d-name">—</h2>
-    <div class="d-tu" id="d-tu"></div>
     <div class="d-sub" id="d-years"></div>
     <span class="d-chip" id="d-gender"></span>
   </div>
@@ -649,17 +646,17 @@
 /* ===========================================================================
    1) CẤU HÌNH — chỉ cần sửa khối này
    ---------------------------------------------------------------------------
-   - SHEET_ID : lấy từ link Google Sheet của bạn:
-        https://docs.google.com/spreadsheets/d/ ⟶ ĐOẠN_NÀY ⟵ /edit
-   - TAB      : tên tab (sheet) chứa dữ liệu, ví dụ "GiaPha"
+   - DATA_URL : URL Web App (Apps Script) trả dữ liệu — để trống thì dùng REQUEST_URL.
+        Nhờ vậy Google Sheet & thư mục Drive được để RIÊNG TƯ (Restricted):
+        người lạ xem mã nguồn trang chỉ thấy URL script, không vào được Sheet/Drive.
    - ROOT_ID  : id người làm gốc cây (để trống = tự chọn người đời nhỏ nhất)
    - FAMILY_NAME / SEAL : tên dòng họ & chữ trên con dấu
-   Bật chia sẻ Sheet: "Bất kỳ ai có đường liên kết đều có thể xem".
-   Để trống SHEET_ID ⟶ trang chạy bằng DỮ LIỆU MẪU bên dưới.
+   Không điền URL nào ⟶ trang chạy bằng DỮ LIỆU MẪU bên dưới.
 =========================================================================== */
 const CONFIG = {
-  SHEET_ID: "1zhE6WdbfF9bsMldSkXVgzMa1NShx09vLdF1-IFt_HaU",   // <-- ID Google Sheet
-  TAB:      "GiaPha",
+  // Dữ liệu KHÔNG còn đọc thẳng từ Google Sheet nữa (để Sheet/Drive có thể để RIÊNG TƯ).
+  // App gọi Apps Script Web App — script chạy dưới quyền của bạn, đọc Sheet riêng tư rồi trả dữ liệu.
+  DATA_URL: "",              // để trống = dùng chung URL với REQUEST_URL bên dưới
   ROOT_ID:  "",
   FAMILY_NAME: "Gia phả họ Hồ",
   SEAL: "胡",                    // chữ Hán/ký tự trên dấu triện (họ Hồ = 胡)
@@ -1203,7 +1200,6 @@ function openDetail(datum){
   const x = datum.data;
   $('#d-gen').textContent = x.doi ? ('Đời '+x.doi) : 'Đời —';
   $('#d-name').textContent = x.ho_ten;
-  $('#d-tu').textContent = x.tu ? (x.tu) : '';
   $('#d-years').textContent = x.years || '';
   const g=$('#d-gender'); g.textContent = datum.data.gender==='F'?'Nữ':'Nam';
   g.className='d-chip '+(datum.data.gender==='F'?'f':'m');
@@ -1316,32 +1312,47 @@ function openFromUrl(){
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 /* ===========================================================================
-   5) NẠP DỮ LIỆU: Google Sheet (qua opensheet) hoặc dữ liệu mẫu
+   5) NẠP DỮ LIỆU: qua Apps Script (Sheet riêng tư) hoặc dữ liệu mẫu
 =========================================================================== */
+/* Gọi Apps Script bằng JSONP (thẻ <script>) — không vướng CORS, chạy tốt trên iOS/Safari */
+function jsonpGet(url, timeoutMs){
+  return new Promise((resolve, reject)=>{
+    const cb = '__gp_cb_' + Math.random().toString(36).slice(2);
+    const s = document.createElement('script');
+    let done = false;
+    const cleanup = ()=>{ try{ delete window[cb]; }catch(_){ window[cb]=undefined; } if(s.parentNode) s.parentNode.removeChild(s); };
+    window[cb] = (data)=>{ done=true; cleanup(); resolve(data); };
+    s.onerror = ()=>{ if(!done){ cleanup(); reject(new Error('không kết nối được')); } };
+    s.src = url + (url.indexOf('?')>=0 ? '&' : '?') + 'callback=' + cb + '&t=' + Date.now();
+    document.head.appendChild(s);
+    setTimeout(()=>{ if(!done){ cleanup(); reject(new Error('quá hạn chờ')); } }, timeoutMs || 20000);
+  });
+}
+
 async function load(){
   $('#familyName').textContent = CONFIG.FAMILY_NAME || 'Cây gia phả';
   $('#seal').textContent = CONFIG.SEAL || '族';
   document.title = (CONFIG.FAMILY_NAME||'Gia phả') + ' — Cây gia phả';
 
   let rows = null, fromSheet = false;
-  if(CONFIG.SHEET_ID && CONFIG.SHEET_ID.trim()){
-    const url = `https://opensheet.elk.sh/${encodeURIComponent(CONFIG.SHEET_ID.trim())}/${encodeURIComponent(CONFIG.TAB.trim())}`;
+  const dataUrl = (CONFIG.DATA_URL && CONFIG.DATA_URL.trim()) || (CONFIG.REQUEST_URL && CONFIG.REQUEST_URL.trim()) || '';
+  if(dataUrl){
     try{
-      const res = await fetch(url);
-      if(!res.ok) throw new Error('HTTP '+res.status);
-      rows = await res.json();
+      const res = await jsonpGet(dataUrl + '?action=data');
+      if(!res || res.ok===false) throw new Error((res && res.error) || 'Script báo lỗi');
+      rows = res.rows;
       if(!Array.isArray(rows) || !rows.length) throw new Error('Sheet rỗng');
       fromSheet = true;
       try{ localStorage.setItem('giapha_cache', JSON.stringify(rows)); }catch(_){}
     }catch(err){
       // dùng bản lưu ở máy nếu có, nếu không thì dữ liệu mẫu
       let cached=null; try{ cached=JSON.parse(localStorage.getItem('giapha_cache')||'null'); }catch(_){}
-      if(cached && cached.length){ rows=cached; showBanner('Không tải được Google Sheet — đang dùng <b>bản lưu ngoại tuyến</b> gần nhất.'); }
-      else { rows=SAMPLE_ROWS; showBanner('Không tải được Google Sheet ('+err.message+') — đang dùng <b>dữ liệu mẫu</b>.'); }
+      if(cached && cached.length){ rows=cached; showBanner('Không tải được dữ liệu — đang dùng <b>bản lưu ngoại tuyến</b> gần nhất.'); }
+      else { rows=SAMPLE_ROWS; showBanner('Không tải được dữ liệu ('+err.message+') — đang dùng <b>dữ liệu mẫu</b>.'); }
     }
   } else {
     rows = SAMPLE_ROWS;
-    showBanner('Đang chạy bằng <b>dữ liệu mẫu</b>. Mở file, điền <b>SHEET_ID</b> trong khối CONFIG để dùng gia phả của bạn.');
+    showBanner('Đang chạy bằng <b>dữ liệu mẫu</b>. Mở file, điền <b>DATA_URL</b> (hoặc REQUEST_URL) trong khối CONFIG.');
   }
 
   const {data, rootId} = transform(rows);
